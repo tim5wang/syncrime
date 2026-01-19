@@ -1,0 +1,193 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">SyncRime Plugin</string>
+    <string name="plugin_description">智能输入内容采集与同步插件</string>
+    
+    <!-- 主界面 -->
+    <string name="main_title">SyncRime</string>
+    <string name="main_subtitle">智能输入同步</string>
+    
+    <!-- 设置界面 -->
+    <string name="settings_title">设置</string>
+    <string name="server_settings">服务器设置</string>
+    <string name="sync_settings">同步设置</string>
+    <string name="capture_settings">采集设置</string>
+    <string name="privacy_settings">隐私设置</string>
+    <string name="ui_settings">界面设置</string>
+    
+    <!-- 服务器设置 -->
+    <string name="server_url">服务器地址</string>
+    <string name="server_url_hint">https://api.syncrime.com</string>
+    <string name="server_timeout">超时时间 (秒)</string>
+    <string name="server_retry_count">重试次数</string>
+    <string name="test_connection">测试连接</string>
+    <string name="connection_test_success">连接测试成功</string>
+    <string name="connection_test_failed">连接测试失败</string>
+    
+    <!-- 同步设置 -->
+    <string name="auto_sync">自动同步</string>
+    <string name="sync_interval">同步间隔 (秒)</string>
+    <string name="wifi_only">仅Wi-Fi同步</string>
+    <string name="compression">数据压缩</string>
+    <string name="encryption">数据加密</string>
+    <string name="sync_now">立即同步</string>
+    
+    <!-- 采集设置 -->
+    <string name="capture_mode">采集模式</string>
+    <string name="capture_mode_smart">智能模式</string>
+    <string name="capture_mode_all">全部采集</string>
+    <string name="capture_mode_filtered">过滤模式</string>
+    <string name="session_timeout">会话超时 (秒)</string>
+    <string name="min_session_length">最小会话长度</string>
+    <string name="capture_sensitive_data">采集敏感数据</string>
+    <string name="capture_emoji">采集表情符号</string>
+    <string name="capture_gestures">采集手势</string>
+    
+    <!-- 隐私设置 -->
+    <string name="anonymize_data">数据匿名化</string>
+    <string name="exclude_passwords">排除密码</string>
+    <string name="exclude_sensitive_info">排除敏感信息</string>
+    <string name="data_retention_days">数据保留天数</string>
+    <string name="local_encryption">本地加密</string>
+    
+    <!-- 界面设置 -->
+    <string name="theme">主题</string>
+    <string name="theme_light">浅色</string>
+    <string name="theme_dark">深色</string>
+    <string name="theme_auto">自动</string>
+    <string name="language">语言</string>
+    <string name="notifications">通知</string>
+    <string name="debug_mode">调试模式</string>
+    
+    <!-- 统计界面 -->
+    <string name="statistics_title">统计信息</string>
+    <string name="total_sessions">总会话数</string>
+    <string name="total_inputs">总输入数</string>
+    <string name="total_syncs">总同步次数</string>
+    <string name="successful_syncs">成功同步</string>
+    <string name="failed_syncs">失败同步</string>
+    <string name="average_session_length">平均会话长度</string>
+    <string name="data_synced">已同步数据</string>
+    <string name="last_sync_time">上次同步时间</string>
+    
+    <!-- 状态信息 -->
+    <string name="status_ready">就绪</string>
+    <string name="status_capturing">采集中</string>
+    <string name="status_syncing">同步中</string>
+    <string name="status_error">错误</string>
+    <string name="status_idle">空闲</string>
+    
+    <!-- 按钮操作 -->
+    <string name="start_capture">开始采集</string>
+    <string name="stop_capture">停止采集</string>
+    <string name="force_sync">强制同步</string>
+    <string name="export_config">导出配置</string>
+    <string name="import_config">导入配置</string>
+    <string name="reset_config">重置配置</string>
+    <string name="clear_data">清除数据</string>
+    
+    <!-- 通知消息 -->
+    <string name="notification_sync_title">SyncRime 同步</string>
+    <string name="notification_sync_content">正在同步输入数据…</string>
+    <string name="notification_sync_success">同步完成</string>
+    <string name="notification_sync_failed">同步失败</string>
+    <string name="notification_capture_title">SyncRime 采集</string>
+    <string name="notification_capture_content">正在采集输入数据</string>
+    
+    <!-- 错误消息 -->
+    <string name="error_network">网络连接失败</string>
+    <string name="error_server">服务器错误</string>
+    <string name="error_config">配置错误</string>
+    <string name="error_permission">权限不足</string>
+    <string name="error_storage">存储空间不足</string>
+    <string name="error_unknown">未知错误</string>
+    
+    <!-- 确认消息 -->
+    <string name="confirm_reset_config">确定要重置配置吗？</string>
+    <string name="confirm_clear_data">确定要清除所有数据吗？</string>
+    <string name="confirm_delete_session">确定要删除此会话吗？</string>
+    
+    <!-- 成功消息 -->
+    <string name="success_config_saved">配置已保存</string>
+    <string name="success_config_imported">配置已导入</string>
+    <string name="success_data_exported">数据已导出</string>
+    <string name="success_data_cleared">数据已清除</string>
+    
+    <!-- 时间格式 -->
+    <string name="time_format_ago">%s前</string>
+    <string name="time_format_minutes">分钟</string>
+    <string name="time_format_hours">小时</string>
+    <string name="time_format_days">天</string>
+    <string name="time_format_never">从未</string>
+    
+    <!-- 单位 -->
+    <string name="unit_inputs">条输入</string>
+    <string name="unit_sessions">个会话</string>
+    <string name="unit_times">次</string>
+    <string name="unit_kb">KB</string>
+    <string name="unit_mb">MB</string>
+    <string name="unit_gb">GB</string>
+    
+    <!-- 权限请求 -->
+    <string name="permission_network_title">网络权限</string>
+    <string name="permission_network_message">需要网络权限来同步数据</string>
+    <string name="permission_storage_title">存储权限</string>
+    <string name="permission_storage_message">需要存储权限来保存配置和数据</string>
+    
+    <!-- 对话框 -->
+    <string name="dialog_ok">确定</string>
+    <string name="dialog_cancel">取消</string>
+    <string name="dialog_yes">是</string>
+    <string name="dialog_no">否</string>
+    <string name="dialog_retry">重试</string>
+    <string name="dialog_ignore">忽略</string>
+    
+    <!-- 空状态 -->
+    <string name="empty_sessions">暂无输入会话</string>
+    <string name="empty_sync_history">暂无同步记录</string>
+    <string name="empty_search_results">搜索结果为空</string>
+    <string name="empty_statistics">暂无统计数据</string>
+    
+    <!-- 加载状态 -->
+    <string name="loading_sync">正在同步…</string>
+    <string name="loading_config">正在加载配置…</string>
+    <string name="loading_data">正在加载数据…</string>
+    <string name="loading_analyzing">正在分析…</string>
+    
+    <!-- 版本信息 -->
+    <string name="version">版本</string>
+    <string name="build_info">构建信息</string>
+    <string name="changelog">更新日志</string>
+    <string name="about">关于</string>
+    <string name="help">帮助</string>
+    <string name="feedback">反馈</string>
+    
+    <!-- 提示信息 -->
+    <string name="tip_capture_enabled">输入采集已启用</string>
+    <string name="tip_capture_disabled">输入采集已禁用</string>
+    <string name="tip_sync_enabled">自动同步已启用</string>
+    <string name="tip_sync_disabled">自动同步已禁用</string>
+    <string name="tip_wifi_only">仅在Wi-Fi环境下同步</string>
+    
+    <!-- 通用 -->
+    <string name="app_name_short">SyncRime</string>
+    <string name="ok">确定</string>
+    <string name="cancel">取消</string>
+    <string name="save">保存</string>
+    <string name="delete">删除</string>
+    <string name="edit">编辑</string>
+    <string name="copy">复制</string>
+    <string name="share">分享</string>
+    <string name="refresh">刷新</string>
+    <string name="search">搜索</string>
+    <string name="filter">过滤</string>
+    <string name="sort">排序</string>
+    <string name="more">更多</string>
+    <string name="settings">设置</string>
+    <string name="close">关闭</string>
+    <string name="back">返回</string>
+    <string name="next">下一步</string>
+    <string name="previous">上一步</string>
+    <string name="finish">完成</string>
+    
+</resources>

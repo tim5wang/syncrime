@@ -1,0 +1,403 @@
+# SyncRime 输入法方案配置
+# 基于 Trime 输入法的 SyncRime 集成方案
+
+# 方案元数据
+__name: "SyncRime 智能输入"
+__version: "1.0.0"
+__author: "SyncRime Team"
+__description: "集成 SyncRime 智能输入内容采集与同步功能的输入方案"
+
+# 基础方案继承
+__include: default
+
+# SyncRime 特定配置
+syncrime:
+  # 输入方案标识
+  scheme_id: "syncrime_smart"
+  
+  # 启用 SyncRime 功能
+  enabled: true
+  
+  # 智能输入增强
+  smart_input:
+    # 启用智能候选
+    intelligent_candidates: true
+    
+    # 启用学习功能
+    learning_enabled: true
+    
+    # 启用个性化推荐
+    personalized_recommendations: true
+    
+    # 启用上下文感知
+    context_aware: true
+  
+  # 同步集成
+  sync_integration:
+    # 启用实时同步
+    real_time_sync: true
+    
+    # 同步用户词典
+    sync_user_dict: true
+    
+    # 同步输入历史
+    sync_input_history: true
+    
+    # 同步用户设置
+    sync_settings: true
+  
+  # 数据采集
+  data_collection:
+    # 采集模式
+    capture_mode: "smart"  # smart, all, filtered
+    
+    # 启用输入记录
+    record_inputs: true
+    
+    # 启用候选词记录
+    record_candidates: true
+    
+    # 启用按键记录
+    record_keystrokes: false
+    
+    # 启用手势记录
+    record_gestures: true
+    
+    # 敏感信息过滤
+    filter_sensitive: true
+  
+  # 分析功能
+  analysis:
+    # 启用输入模式分析
+    pattern_analysis: true
+    
+    # 启用频率分析
+    frequency_analysis: true
+    
+    # 启用语义分析
+    semantic_analysis: true
+    
+    # 启用情感分析
+    sentiment_analysis: false
+
+# 输入引擎配置
+engine:
+  # 基础引擎
+  processors:
+    - ascii_composer
+    - recognizer
+    - key_binder
+    - speller
+    - punctuator
+    - selector
+    - navigator
+    - express_editor
+  
+  # SyncRime 增强处理器
+  syncrime_processors:
+    - syncrime_capture
+    - syncrime_analyzer
+    - syncrime_learner
+    - syncrime_sync
+  
+  # 翻译器
+  translators:
+    - echo_translator
+    - script_translator
+    - table_translator
+    - syncrime_translator
+  
+  # 过滤器
+  filters:
+    - simplifier
+    - reverser
+    - uniquifier
+    - syncrime_filter
+
+# 拼音配置
+speller:
+  alphabet: zyxwvutsrqponmlkjihgfedcba
+  delimiter: " '"
+  algebra:
+    - abbrev/^([a-z]).+$/$1/
+    - abbrev/^([zcs]h).+$/$1/
+
+# 输入规则
+input_rules:
+  # 智能拼音输入
+  pinyin:
+    pattern: "^([a-z]+;?)+$"
+    enable: true
+    sync_capture: true
+  
+  # 英文输入
+  english:
+    pattern: "^[a-zA-Z]+$"
+    enable: true
+    sync_capture: true
+  
+  # 数字输入
+  number:
+    pattern: "^[0-9]+$"
+    enable: true
+    sync_capture: true
+  
+  # 符号输入
+  symbol:
+    pattern: "^[\\p{Punct}]+$"
+    enable: true
+    sync_capture: false
+  
+  # 混合输入
+  mixed:
+    pattern: "^[a-zA-Z0-9\\p{Punct}]+$"
+    enable: true
+    sync_capture: true
+
+# 候选词配置
+candidates:
+  # 候选词数量
+  max_candidates: 10
+  
+  # SyncRime 智能候选
+  syncrime_candidates:
+    # 启用智能排序
+    intelligent_sorting: true
+    
+    # 启用个性化排序
+    personalized_sorting: true
+    
+    # 启用上下文排序
+    contextual_sorting: true
+    
+    # 启用频率排序
+    frequency_sorting: true
+    
+    # 候选词权重
+    weights:
+      frequency: 0.4
+      recency: 0.3
+      context: 0.2
+      personal: 0.1
+
+# 快捷键配置
+key_binder:
+  # SyncRime 快捷键
+  syncrime_bindings:
+    # 同步快捷键
+    - { when: composing, accept: Control+Shift+S, send: syncrime_sync }
+    
+    # 设置快捷键
+    - { when: has_menu, accept: Control+Shift+P, send: syncrime_settings }
+    
+    # 统计快捷键
+    - { when: always, accept: Control+Shift+I, send: syncrime_statistics }
+    
+    # 学习开关
+    - { when: always, accept: Control+Shift+L, send: syncrime_toggle_learning }
+    
+    # 采集开关
+    - { when: always, accept: Control+Shift+C, send: syncrime_toggle_capture }
+
+# 标点符号配置
+punctuator:
+  # SyncRime 智能标点
+  syncrime_punctuator:
+    # 启用智能标点
+    intelligent_punctuation: true
+    
+    # 学习用户标点习惯
+    learn_user_habits: true
+    
+    # 基于上下文的标点
+    contextual_punctuation: true
+
+# 识别器配置
+recognizer:
+  # SyncRime 识别规则
+  syncrime_patterns:
+    # 同步命令
+    sync_command: "^/sync.*$"
+    
+    # 设置命令
+    settings_command: "^/settings.*$"
+    
+    # 统计命令
+    statistics_command: "^/stats.*$"
+    
+    # 学习命令
+    learning_command: "^/learn.*$"
+
+# 同步配置
+sync:
+  # 实时同步
+  real_time:
+    enabled: true
+    interval: 60  # 秒
+    batch_size: 10
+  
+  # 批量同步
+  batch:
+    enabled: true
+    interval: 300  # 秒
+    max_batch_size: 50
+  
+  # 冲突解决
+  conflict_resolution:
+    strategy: "prefer_local"
+    auto_resolve: true
+    manual_review: false
+
+# 学习配置
+learning:
+  # 用户词典学习
+  user_dict:
+    enabled: true
+    min_frequency: 3
+    max_entries: 10000
+    sync_enabled: true
+  
+  # 输入模式学习
+  pattern_learning:
+    enabled: true
+    min_samples: 10
+    max_patterns: 1000
+    sync_enabled: true
+  
+  # 上下文学习
+  context_learning:
+    enabled: true
+    window_size: 10
+    max_contexts: 500
+    sync_enabled: true
+
+# 皮肤配置
+skin:
+  # SyncRime 皮肤
+  syncrime_skin:
+    # 启用 SyncRime 主题
+    enabled: true
+    
+    # 同步状态指示器
+    sync_indicator:
+      position: "top_right"
+      style: "minimal"
+      colors:
+        syncing: "#2196F3"
+        success: "#4CAF50"
+        error: "#F44336"
+        offline: "#9E9E9E"
+    
+    # 采集状态指示器
+    capture_indicator:
+      position: "top_left"
+      style: "minimal"
+      colors:
+        active: "#4CAF50"
+        inactive: "#9E9E9E"
+        error: "#F44336"
+    
+    # 智能提示
+    smart_hints:
+      enabled: true
+      position: "bottom"
+      style: "toast"
+      duration: 2000
+
+# 状态栏配置
+status_bar:
+  # SyncRime 状态项
+  syncrime_status:
+    # 同步状态
+    sync_status: true
+    
+    # 采集状态
+    capture_status: true
+    
+    # 学习状态
+    learning_status: true
+    
+    # 网络状态
+    network_status: true
+    
+    # 存储状态
+    storage_status: false
+
+# 菜单配置
+menu:
+  # SyncRime 菜单项
+  syncrime_menu:
+    # 同步设置
+    sync_settings: true
+    
+    # 采集设置
+    capture_settings: true
+    
+    # 学习设置
+    learning_settings: true
+    
+    # 统计信息
+    statistics: true
+    
+    # 帮助信息
+    help: true
+
+# 消息配置
+messages:
+  # SyncRime 消息
+  syncrime_messages:
+    # 同步成功
+    sync_success: "同步完成"
+    
+    # 同步失败
+    sync_failed: "同步失败"
+    
+    # 采集开始
+    capture_started: "开始采集输入"
+    
+    # 采集停止
+    capture_stopped: "停止采集输入"
+    
+    # 学习启用
+    learning_enabled: "学习功能已启用"
+    
+    # 学习禁用
+    learning_disabled: "学习功能已禁用"
+
+# 性能配置
+performance:
+  # SyncRime 性能优化
+  syncrime_performance:
+    # 启用缓存
+    enable_cache: true
+    
+    # 缓存大小
+    cache_size: 1000
+    
+    # 异步处理
+    async_processing: true
+    
+    # 线程池大小
+    thread_pool_size: 4
+    
+    # 内存限制
+    memory_limit: "64MB"
+
+# 调试配置
+debug:
+  # SyncRime 调试
+  syncrime_debug:
+    # 启用调试
+    enabled: false
+    
+    # 日志级别
+    log_level: "INFO"
+    
+    # 性能监控
+    performance_monitoring: false
+    
+    # 网络调试
+    network_debug: false
+    
+    # 同步调试
+    sync_debug: false

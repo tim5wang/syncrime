@@ -1,0 +1,161 @@
+# SyncRime Trime 配置文件
+# Trime 输入法 SyncRime 插件配置
+
+# 基础配置
+__version: "1.0.0"
+__author: "SyncRime Team"
+__description: "SyncRime 智能输入内容采集与同步插件"
+
+# 插件元数据
+plugin:
+  name: "SyncRime"
+  version: "1.0.0"
+  description: "智能输入内容采集与同步插件"
+  author: "SyncRime Team"
+  website: "https://syncrime.com"
+  
+# 服务器配置
+server:
+  url: "https://api.syncrime.com"
+  timeout: 30000
+  retry_count: 3
+  api_version: "v1"
+  endpoints:
+    sync: "/sync"
+    auth: "/auth"
+    config: "/config"
+    statistics: "/statistics"
+  
+# 同步配置
+sync:
+  auto_sync: true
+  sync_interval: 300
+  wifi_only: true
+  compression: true
+  encryption: true
+  batch_size: 50
+  max_retry: 3
+  conflict_resolution: "prefer_local"
+  
+# 采集配置
+capture:
+  capture_mode: "smart"  # smart, all, filtered
+  session_timeout: 300000  # 5分钟
+  min_session_length: 3
+  capture_sensitive_data: false
+  capture_emoji: true
+  capture_gestures: true
+  max_input_length: 10000
+  min_input_length: 1
+  
+# 分析配置
+analysis:
+  enable_pattern_analysis: true
+  enable_importance_analysis: true
+  enable_category_analysis: true
+  enable_semantic_analysis: false
+  min_text_length: 3
+  max_text_length: 10000
+  importance_threshold: 2
+  
+# 存储配置
+storage:
+  max_sessions: 1000
+  max_session_age: 604800000  # 7天
+  cache_size: 100
+  backup_enabled: true
+  backup_interval: 86400000  # 24小时
+  backup_count: 5
+  storage_path: "data/sessions"
+  
+# 隐私配置
+privacy:
+  anonymize_data: true
+  exclude_passwords: true
+  exclude_sensitive_info: true
+  data_retention_days: 30
+  local_encryption: true
+  encryption_algorithm: "AES-256-GCM"
+  hash_sensitive_data: true
+  
+# UI配置
+ui:
+  theme: "auto"  # light, dark, auto
+  language: "auto"  # zh-CN, en-US, auto
+  notifications_enabled: true
+  debug_mode: false
+  log_level: "INFO"
+  
+# 性能配置
+performance:
+  thread_pool_size: 4
+  max_concurrent_syncs: 2
+  memory_limit: 134217728  # 128MB
+  cpu_limit: 50
+  network_timeout: 30000
+  
+# 日志配置
+logging:
+  enabled: true
+  level: "INFO"
+  file_enabled: true
+  file_path: "logs/syncrime.log"
+  max_file_size: 10485760  # 10MB
+  max_files: 5
+  console_enabled: true
+  
+# 调试配置
+debug:
+  enabled: false
+  verbose_logging: false
+  network_debug: false
+  sync_debug: false
+  capture_debug: false
+  performance_monitoring: false
+  
+# 安全配置
+security:
+  certificate_validation: true
+  ssl_protocols: ["TLSv1.2", "TLSv1.3"]
+  cipher_suites: ["AES256-GCM-SHA384", "AES128-GCM-SHA256"]
+  pin_certificates: false
+  api_key_rotation: true
+  
+# 网络配置
+network:
+  user_agent: "SyncRime/1.0.0 (Android)"
+  connection_timeout: 30000
+  read_timeout: 60000
+  write_timeout: 60000
+  max_connections: 10
+  keep_alive: true
+  
+# 事件配置
+events:
+  on_session_start: true
+  on_session_end: true
+  on_input_captured: true
+  on_sync_started: true
+  on_sync_completed: true
+  on_error: true
+  
+# 集成配置
+integration:
+  trime:
+    enabled: true
+    version_min: "3.2.0"
+    hooks:
+      - "on_commit"
+      - "on_key_event"
+      - "on_gesture"
+  android:
+    accessibility_service: false
+    notification_service: true
+    foreground_service: true
+    
+# 扩展配置
+extensions:
+  plugins: []
+  modules: []
+  themes: []
+  languages: []

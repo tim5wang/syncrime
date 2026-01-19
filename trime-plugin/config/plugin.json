@@ -1,0 +1,161 @@
+{
+  "schema_version": "1.0",
+  "plugin_config": {
+    "metadata": {
+      "name": "SyncRime Plugin",
+      "version": "1.0.0",
+      "description": "智能输入内容采集与同步插件",
+      "author": "SyncRime Team",
+      "license": "MIT",
+      "homepage": "https://syncrime.com"
+    },
+    "trime_integration": {
+      "compatible_versions": ["3.2.0", "3.2.1", "3.3.0"],
+      "entry_points": [
+        "com.syncrime.trime.plugin.SyncRimePlugin"
+      ],
+      "hooks": {
+        "on_commit": "capture_input",
+        "on_key_event": "capture_key",
+        "on_gesture": "capture_gesture",
+        "on_focus_change": "handle_focus"
+      }
+    },
+    "permissions": [
+      "android.permission.INTERNET",
+      "android.permission.ACCESS_NETWORK_STATE",
+      "android.permission.WRITE_EXTERNAL_STORAGE",
+      "android.permission.READ_EXTERNAL_STORAGE"
+    ],
+    "features": {
+      "input_capture": {
+        "enabled": true,
+        "modes": ["smart", "all", "filtered"],
+        "default_mode": "smart",
+        "supports_encryption": true
+      },
+      "data_sync": {
+        "enabled": true,
+        "auto_sync": true,
+        "conflict_resolution": true,
+        "offline_support": true
+      },
+      "analysis": {
+        "pattern_recognition": true,
+        "importance_analysis": true,
+        "category_classification": true,
+        "semantic_analysis": false
+      }
+    },
+    "configuration": {
+      "file_format": ["yaml", "json"],
+      "schema_version": "1.0",
+      "validation": true,
+      "hot_reload": false
+    },
+    "performance": {
+      "thread_pool_size": 4,
+      "max_memory_usage": "128MB",
+      "async_operations": true,
+      "caching_enabled": true
+    },
+    "security": {
+      "encryption_supported": true,
+      "data_anonymization": true,
+      "secure_communication": true,
+      "local_storage_encryption": true
+    },
+    "debugging": {
+      "logging_levels": ["DEBUG", "INFO", "WARN", "ERROR"],
+      "performance_monitoring": false,
+      "network_logging": false,
+      "crash_reporting": false
+    }
+  },
+  "syncrime_config_schema": {
+    "type": "object",
+    "properties": {
+      "server": {
+        "type": "object",
+        "properties": {
+          "url": {"type": "string", "format": "uri"},
+          "timeout": {"type": "integer", "minimum": 1000, "maximum": 300000},
+          "retry_count": {"type": "integer", "minimum": 0, "maximum": 10}
+        },
+        "required": ["url"]
+      },
+      "sync": {
+        "type": "object",
+        "properties": {
+          "auto_sync": {"type": "boolean"},
+          "sync_interval": {"type": "integer", "minimum": 60},
+          "wifi_only": {"type": "boolean"},
+          "compression": {"type": "boolean"},
+          "encryption": {"type": "boolean"}
+        }
+      },
+      "capture": {
+        "type": "object",
+        "properties": {
+          "capture_mode": {"type": "string", "enum": ["smart", "all", "filtered"]},
+          "session_timeout": {"type": "integer", "minimum": 30000},
+          "min_session_length": {"type": "integer", "minimum": 1},
+          "capture_sensitive_data": {"type": "boolean"},
+          "capture_emoji": {"type": "boolean"},
+          "capture_gestures": {"type": "boolean"}
+        }
+      },
+      "privacy": {
+        "type": "object",
+        "properties": {
+          "anonymize_data": {"type": "boolean"},
+          "exclude_passwords": {"type": "boolean"},
+          "exclude_sensitive_info": {"type": "boolean"},
+          "data_retention_days": {"type": "integer", "minimum": 1},
+          "local_encryption": {"type": "boolean"}
+        }
+      }
+    },
+    "required": ["server"]
+  },
+  "default_settings": {
+    "server": {
+      "url": "https://api.syncrime.com",
+      "timeout": 30000,
+      "retry_count": 3
+    },
+    "sync": {
+      "auto_sync": true,
+      "sync_interval": 300,
+      "wifi_only": true,
+      "compression": true,
+      "encryption": true
+    },
+    "capture": {
+      "capture_mode": "smart",
+      "session_timeout": 300000,
+      "min_session_length": 3,
+      "capture_sensitive_data": false,
+      "capture_emoji": true,
+      "capture_gestures": true
+    },
+    "privacy": {
+      "anonymize_data": true,
+      "exclude_passwords": true,
+      "exclude_sensitive_info": true,
+      "data_retention_days": 30,
+      "local_encryption": true
+    }
+  },
+  "installation": {
+    "method": "plugin",
+    "dependencies": [],
+    "optional_dependencies": [],
+    "system_requirements": {
+      "android_min_version": "24",
+      "android_target_version": "34",
+      "ram_min": "512MB",
+      "storage_min": "50MB"
+    }
+  }
+}

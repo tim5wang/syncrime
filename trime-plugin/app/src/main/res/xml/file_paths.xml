@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- 内部存储 -->
+    <files-path name="internal_files" path="." />
+    <cache-path name="internal_cache" path="." />
+    
+    <!-- 外部存储 -->
+    <external-files-path name="external_files" path="." />
+    <external-cache-path name="external_cache" path="." />
+    
+    <!-- 配置文件 -->
+    <files-path name="config" path="config/" />
+    <files-path name="backup" path="backup/" />
+    <files-path name="logs" path="logs/" />
+    
+    <!-- 数据文件 -->
+    <files-path name="data" path="data/" />
+    <files-path name="sessions" path="sessions/" />
+    <files-path name="sync" path="sync/" />
+</paths>

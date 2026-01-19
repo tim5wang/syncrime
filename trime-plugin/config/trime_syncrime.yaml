@@ -1,0 +1,368 @@
+# SyncRime Trime 插件配置文件
+
+# 基础输入法配置
+__include: default
+
+# SyncRime 插件配置
+syncrime:
+  # 插件启用状态
+  enabled: true
+  
+  # 数据采集配置
+  capture:
+    # 采集模式: smart, all, filtered
+    mode: smart
+    
+    # 会话超时时间 (毫秒)
+    session_timeout: 300000
+    
+    # 最小会话长度
+    min_session_length: 3
+    
+    # 采集敏感数据
+    capture_sensitive_data: false
+    
+    # 采集表情符号
+    capture_emoji: true
+    
+    # 采集手势
+    capture_gestures: true
+    
+    # 最大输入长度
+    max_input_length: 10000
+    
+    # 最小输入长度
+    min_input_length: 1
+  
+  # 同步配置
+  sync:
+    # 自动同步
+    auto_sync: true
+    
+    # 同步间隔 (秒)
+    sync_interval: 300
+    
+    # 仅WiFi同步
+    wifi_only: true
+    
+    # 数据压缩
+    compression: true
+    
+    # 数据加密
+    encryption: true
+    
+    # 批量大小
+    batch_size: 50
+    
+    # 最大重试次数
+    max_retry: 3
+    
+    # 冲突解决策略: prefer_local, prefer_remote, manual
+    conflict_resolution: prefer_local
+  
+  # 服务器配置
+  server:
+    # 服务器URL
+    url: https://api.syncrime.com
+    
+    # API版本
+    api_version: v1
+    
+    # 超时时间 (毫秒)
+    timeout: 30000
+    
+    # 重试次数
+    retry_count: 3
+    
+    # 端点配置
+    endpoints:
+      sync: /sync
+      auth: /auth
+      config: /config
+      statistics: /statistics
+  
+  # 隐私配置
+  privacy:
+    # 数据匿名化
+    anonymize_data: true
+    
+    # 排除密码
+    exclude_passwords: true
+    
+    # 排除敏感信息
+    exclude_sensitive_info: true
+    
+    # 数据保留天数
+    data_retention_days: 30
+    
+    # 本地加密
+    local_encryption: true
+    
+    # 加密算法
+    encryption_algorithm: AES-256-GCM
+    
+    # 敏感数据哈希
+    hash_sensitive_data: true
+  
+  # 分析配置
+  analysis:
+    # 启用模式分析
+    enable_pattern_analysis: true
+    
+    # 启用重要性分析
+    enable_importance_analysis: true
+    
+    # 启用分类分析
+    enable_category_analysis: true
+    
+    # 启用语义分析
+    enable_semantic_analysis: false
+    
+    # 最小文本长度
+    min_text_length: 3
+    
+    # 最大文本长度
+    max_text_length: 10000
+    
+    # 重要性阈值
+    importance_threshold: 2
+  
+  # 存储配置
+  storage:
+    # 最大会话数
+    max_sessions: 1000
+    
+    # 最大会话年龄 (毫秒)
+    max_session_age: 604800000
+    
+    # 缓存大小
+    cache_size: 100
+    
+    # 启用备份
+    backup_enabled: true
+    
+    # 备份间隔 (毫秒)
+    backup_interval: 86400000
+    
+    # 备份数量
+    backup_count: 5
+    
+    # 存储路径
+    storage_path: data/sessions
+  
+  # UI配置
+  ui:
+    # 主题: light, dark, auto
+    theme: auto
+    
+    # 语言: zh-CN, en-US, auto
+    language: auto
+    
+    # 启用通知
+    notifications_enabled: true
+    
+    # 调试模式
+    debug_mode: false
+    
+    # 日志级别
+    log_level: INFO
+  
+  # 性能配置
+  performance:
+    # 线程池大小
+    thread_pool_size: 4
+    
+    # 最大并发同步数
+    max_concurrent_syncs: 2
+    
+    # 内存限制 (字节)
+    memory_limit: 134217728
+    
+    # CPU限制 (百分比)
+    cpu_limit: 50
+    
+    # 网络超时 (毫秒)
+    network_timeout: 30000
+  
+  # 日志配置
+  logging:
+    # 启用日志
+    enabled: true
+    
+    # 日志级别
+    level: INFO
+    
+    # 文件日志启用
+    file_enabled: true
+    
+    # 文件路径
+    file_path: logs/syncrime.log
+    
+    # 最大文件大小 (字节)
+    max_file_size: 10485760
+    
+    # 最大文件数
+    max_files: 5
+    
+    # 控制台日志启用
+    console_enabled: true
+  
+  # 调试配置
+  debug:
+    # 启用调试
+    enabled: false
+    
+    # 详细日志
+    verbose_logging: false
+    
+    # 网络调试
+    network_debug: false
+    
+    # 同步调试
+    sync_debug: false
+    
+    # 采集调试
+    capture_debug: false
+    
+    # 性能监控
+    performance_monitoring: false
+  
+  # 安全配置
+  security:
+    # 证书验证
+    certificate_validation: true
+    
+    # SSL协议
+    ssl_protocols: [TLSv1.2, TLSv1.3]
+    
+    # 加密套件
+    cipher_suites: [AES256-GCM-SHA384, AES128-GCM-SHA256]
+    
+    # 证书固定
+    pin_certificates: false
+    
+    # API密钥轮换
+    api_key_rotation: true
+  
+  # 网络配置
+  network:
+    # 用户代理
+    user_agent: SyncRime/1.0.0 (Android)
+    
+    # 连接超时
+    connection_timeout: 30000
+    
+    # 读取超时
+    read_timeout: 60000
+    
+    # 写入超时
+    write_timeout: 60000
+    
+    # 最大连接数
+    max_connections: 10
+    
+    # 保持连接
+    keep_alive: true
+  
+  # 事件配置
+  events:
+    # 会话开始事件
+    on_session_start: true
+    
+    # 会话结束事件
+    on_session_end: true
+    
+    # 输入采集事件
+    on_input_captured: true
+    
+    # 同步开始事件
+    on_sync_started: true
+    
+    # 同步完成事件
+    on_sync_completed: true
+    
+    # 错误事件
+    on_error: true
+  
+  # 集成配置
+  integration:
+    # Trime集成
+    trime:
+      # 启用
+      enabled: true
+      
+      # 最小版本
+      version_min: 3.2.0
+      
+      # 钩子
+      hooks:
+        - on_commit
+        - on_key_event
+        - on_gesture
+    
+    # Android集成
+    android:
+      # 无障碍服务
+      accessibility_service: false
+      
+      # 通知服务
+      notification_service: true
+      
+      # 前台服务
+      foreground_service: true
+  
+  # 扩展配置
+  extensions:
+    # 插件
+    plugins: []
+    
+    # 模块
+    modules: []
+    
+    # 主题
+    themes: []
+    
+    # 语言
+    languages: []
+
+# Trime 输入法配置集成
+# 在这里可以添加自定义的 Trime 配置
+
+# 键盘布局配置
+keyboard_layout:
+  # SyncRime 特殊按键配置
+  syncrime_keys:
+    # 同步快捷键
+    sync_shortcut: "Ctrl+Shift+S"
+    
+    # 设置快捷键
+    settings_shortcut: "Ctrl+Shift+P"
+    
+    # 统计快捷键
+    statistics_shortcut: "Ctrl+Shift+I"
+
+# 候选词配置
+candidates:
+  # SyncRime 候选词增强
+  syncrime_enhancement:
+    # 启用智能候选
+    smart_candidates: true
+    
+    # 学习用户输入习惯
+    learn_user_patterns: true
+    
+    # 基于会话的候选词
+    session_based_candidates: true
+
+# 皮肤配置
+skin:
+  # SyncRime 皮肤扩展
+  syncrime_skin:
+    # 启用SyncRime主题
+    enabled: true
+    
+    # 同步状态指示器
+    sync_indicator: true
+    
+    # 采集状态指示器
+    capture_indicator: true
