@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<accessibility-service xmlns:android="http://schemas.android.com/android"
+    android:accessibilityEventTypes="typeAllMask"
+    android:accessibilityFeedbackType="feedbackGeneric"
+    android:accessibilityFlags="flagDefault|flagRequestTouchExplorationMode"
+    android:canRetrieveWindowContent="false"
+    android:description="@string/syncrime_accessibility_service"
+    android:notificationTimeout="100"
+    android:settingsActivity="com.syncrime.android.presentation.MainActivity" />

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">SyncRime</string>
+    <string name="syncrime_input_method">SyncRime Input Method</string>
+    <string name="syncrime_accessibility_service">SyncRime Accessibility Service</string>
+    <integer name="google_play_services_version">12451000</integer>
+</resources>

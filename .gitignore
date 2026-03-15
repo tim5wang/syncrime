@@ -1,0 +1,8 @@
+android-client/.gradle/
+android-client/app/build/
+android-client/app/.gradle/
+android-client/build/
+android-client/local.properties
+*.iml
+.DS_Store
+nul
