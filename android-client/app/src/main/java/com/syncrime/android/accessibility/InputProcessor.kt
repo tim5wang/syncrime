@@ -2,7 +2,9 @@ package com.syncrime.android.accessibility
 
 import android.content.Context
 import android.util.Log
+import com.syncrime.android.data.local.database.SyncRimeDatabase
 import com.syncrime.android.data.repository.InputRepository
+import com.syncrime.android.intelligence.IntelligenceEngineManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -19,6 +21,10 @@ class InputProcessor(
     private val context: Context,
     private val inputRepository: InputRepository
 ) {
+    
+    private val intelligenceEngine by lazy {
+        IntelligenceEngineManager(context, inputRepository)
+    }
     
     companion object {
         private const val TAG = "InputProcessor"
@@ -46,8 +52,38 @@ class InputProcessor(
                 // 3. 内容分类
                 val category = analysis.category
                 
-                // 4. 计算置信度
-                val confidence = calculateConfidence(content, analysis)
+                // 4. 智能推荐（如果启用）
+                var isRecommended = false
+                var finalConfidence = calculateConfidence(content, analysis)
+                
+                try {
+                    val inputContext = IntelligenceEngineManager.InputContext(
+                        application = application,
+                        packageName = packageName
+                    )
+                    
+                    // 获取推荐
+                    val recommendations = intelligenceEngine.getRecommendations(
+                        currentInput = content,
+                        context = inputContext
+                    )
+                    
+                    // 如果有高置信度推荐，标记
+                    if (recommendations.any { it.confidence > 0.8f }) {
+                        isRecommended = true
+                        finalConfidence = maxOf(finalConfidence, recommendations.maxOf { it.confidence })
+                    }
+                    
+                    // 学习用户输入习惯
+                    intelligenceEngine.learnFromInput(
+                        input = content,
+                        context = inputContext,
+                        isAccepted = true
+                    )
+                    
+                } catch (e: Exception) {
+                    Log.w(TAG, "智能引擎处理失败，使用基础分析", e)
+                }
                 
                 // 5. 创建记录
                 inputRepository.createRecord(
@@ -57,11 +93,11 @@ class InputProcessor(
                     context = context,
                     isSensitive = isSensitive,
                     category = category,
-                    confidence = confidence,
-                    isRecommended = false
+                    confidence = finalConfidence,
+                    isRecommended = isRecommended
                 )
                 
-                Log.d(TAG, "处理输入：应用=$application, 长度=$characterCount, 分类=$category")
+                Log.d(TAG, "处理输入：应用=$application, 长度=$characterCount, 分类=$category, 推荐=$isRecommended")
                 
             } catch (e: Exception) {
                 Log.e(TAG, "处理输入失败", e)
