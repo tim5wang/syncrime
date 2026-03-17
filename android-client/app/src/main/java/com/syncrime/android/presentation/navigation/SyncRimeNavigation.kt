@@ -8,6 +8,7 @@ import androidx.navigation.compose.rememberNavController
 import com.syncrime.android.presentation.ui.main.MainScreen
 import com.syncrime.android.presentation.ui.settings.SettingsScreen
 import com.syncrime.android.presentation.ui.settings.PermissionManagementScreen
+import com.syncrime.android.presentation.ui.settings.AccessibilitySettingsScreen
 import com.syncrime.android.presentation.ui.statistics.StatisticsScreen
 import com.syncrime.android.presentation.ui.profile.ProfileScreen
 import com.syncrime.android.presentation.ui.main.MainUiState
@@ -17,6 +18,7 @@ sealed class Screen(val route: String) {
     object Main : Screen("main")
     object Settings : Screen("settings")
     object PermissionManagement : Screen("permission_management")
+    object AccessibilitySettings : Screen("accessibility_settings")
     object Statistics : Screen("statistics")
     object Profile : Screen("profile")
 }
@@ -49,6 +51,13 @@ fun SyncRimeNavigation(
         
         composable(Screen.PermissionManagement.route) {
             PermissionManagementScreen(
+                onNavigateBack = { navController.popBackStack() },
+                onNavigateToAccessibilitySettings = { navController.navigate(Screen.AccessibilitySettings.route) }
+            )
+        }
+        
+        composable(Screen.AccessibilitySettings.route) {
+            AccessibilitySettingsScreen(
                 onNavigateBack = { navController.popBackStack() }
             )
         }

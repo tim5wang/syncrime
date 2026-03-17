@@ -30,7 +30,8 @@ data class PermissionUiState(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PermissionManagementScreen(
-    onNavigateBack: () -> Unit = {}
+    onNavigateBack: () -> Unit = {},
+    onNavigateToAccessibilitySettings: () -> Unit = {}
 ) {
     val context = LocalContext.current
     var permissions by remember { 
@@ -85,6 +86,13 @@ fun PermissionManagementScreen(
             
             item {
                 Spacer(modifier = Modifier.height(16.dp))
+                AccessibilityServiceCard(
+                    onClick = onNavigateToAccessibilitySettings
+                )
+            }
+            
+            item {
+                Spacer(modifier = Modifier.height(16.dp))
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     colors = CardDefaults.cardColors(
@@ -103,7 +111,8 @@ fun PermissionManagementScreen(
                         Text(
                             text = "• 通知权限：用于接收同步状态和输入推荐提醒\n" +
                                    "• 存储权限：用于备份和恢复输入数据\n" +
-                                   "• 位置权限：用于智能场景识别（如位置相关的输入建议）",
+                                   "• 位置权限：用于智能场景识别（如位置相关的输入建议）\n" +
+                                   "• 无障碍权限：用于采集输入内容，提供智能推荐",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -266,5 +275,49 @@ private fun handlePermissionRequest(
         PermissionType.NOTIFICATIONS -> PermissionManager.requestNotificationPermission(activity)
         PermissionType.STORAGE -> PermissionManager.requestStoragePermission(activity)
         PermissionType.LOCATION -> PermissionManager.requestLocationPermission(activity)
+    }
+}
+
+@Composable
+private fun AccessibilityServiceCard(onClick: () -> Unit) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onClick() },
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.secondaryContainer
+        )
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = Icons.Default.Accessibility,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.secondary,
+                modifier = Modifier.size(40.dp)
+            )
+            Spacer(modifier = Modifier.width(16.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "无障碍服务",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = "用于采集输入内容，提供智能推荐",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Icon(
+                imageVector = Icons.Default.ChevronRight,
+                contentDescription = "进入设置",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
     }
 }

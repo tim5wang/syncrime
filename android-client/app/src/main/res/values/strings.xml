@@ -3,5 +3,46 @@
     <string name="app_name">SyncRime</string>
     <string name="syncrime_input_method">SyncRime Input Method</string>
     <string name="syncrime_accessibility_service">SyncRime Accessibility Service</string>
+    
+    <!-- Accessibility Service -->
+    <string name="accessibility_service_description">
+        SyncRime 使用无障碍服务来采集您的输入内容，用于提供智能输入推荐和同步功能。
+        
+        我们承诺：
+        • 仅采集输入文本内容
+        • 自动过滤密码、银行卡号等敏感信息
+        • 本地加密存储，保护隐私
+        • 您可随时在设置中关闭此功能
+        
+        注意：本服务不会记录您在密码框、支付页面等敏感场景的输入。
+    </string>
+    
+    <string name="accessibility_service_title">SyncRime 输入采集</string>
+    
+    <!-- Notifications -->
+    <string name="notification_channel_capture_service">输入采集服务</string>
+    <string name="notification_channel_capture_service_desc">显示输入采集服务状态</string>
+    <string name="notification_service_active">SyncRime 输入采集中</string>
+    <string name="notification_service_active_text">正在监听输入，提供智能推荐</string>
+    <string name="notification_input_count">已采集 %1$d 次输入</string>
+    <string name="notification_service_paused">输入采集已暂停</string>
+    <string name="notification_service_paused_text">点击恢复采集</string>
+    
+    <!-- Permissions -->
+    <string name="permission_accessibility_required">需要开启无障碍权限</string>
+    <string name="permission_accessibility_required_desc">SyncRime 需要无障碍权限来采集输入内容，提供智能推荐功能</string>
+    <string name="permission_open_accessibility_settings">打开无障碍设置</string>
+    <string name="permission_later">稍后</string>
+    
+    <!-- Settings -->
+    <string name="settings_capture_title">输入采集</string>
+    <string name="settings_capture_enabled">启用输入采集</string>
+    <string name="settings_capture_enabled_desc">采集输入内容用于智能推荐</string>
+    <string name="settings_capture_sensitive_filter">敏感信息过滤</string>
+    <string name="settings_capture_sensitive_filter_desc">自动过滤密码、银行卡号等敏感信息</string>
+    <string name="settings_capture_status">采集状态</string>
+    <string name="settings_capture_status_active">采集中</string>
+    <string name="settings_capture_status_inactive">未采集</string>
+    
     <integer name="google_play_services_version">12451000</integer>
 </resources>
