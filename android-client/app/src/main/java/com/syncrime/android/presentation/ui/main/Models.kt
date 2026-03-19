@@ -13,27 +13,7 @@ data class MainUiState(
     val userName: String = "用户",
     val recentInputs: List<String> = emptyList(),
     val error: String? = null
-) {
-    fun copy(
-        isLoading: Boolean = this.isLoading,
-        isCapturing: Boolean = this.isCapturing,
-        currentSession: InputSession? = this.currentSession,
-        showApplicationSelector: Boolean = this.showApplicationSelector,
-        userName: String = this.userName,
-        recentInputs: List<String> = this.recentInputs,
-        error: String? = this.error
-    ): MainUiState {
-        return MainUiState(
-            isLoading = isLoading,
-            isCapturing = isCapturing,
-            currentSession = currentSession,
-            showApplicationSelector = showApplicationSelector,
-            userName = userName,
-            recentInputs = recentInputs,
-            error = error
-        )
-    }
-}
+)
 
 data class InputSession(
     val id: String,
@@ -59,16 +39,6 @@ data class SyncStatus(
         Status.SYNCING -> "同步中..."
         Status.SUCCESS -> "同步成功"
         Status.ERROR -> "同步失败"
-    }
-    
-    fun copy(
-        status: Status = this.status,
-        lastSyncTime: Long = this.lastSyncTime
-    ): SyncStatus {
-        return SyncStatus(
-            status = status,
-            lastSyncTime = lastSyncTime
-        )
     }
 }
 

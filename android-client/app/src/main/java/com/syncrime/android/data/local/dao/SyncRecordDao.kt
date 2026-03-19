@@ -28,7 +28,7 @@ interface SyncRecordDao {
     @Query("SELECT COUNT(*) FROM sync_records WHERE date(startTime / 1000, 'unixepoch') = date('now')")
     fun getTodaySyncCount(): Flow<Int>
     
-    @Query("SELECT AVG(duration) FROM sync_records WHERE status = 'SUCCESS'")
+    @Query("SELECT AVG(endTime - startTime) FROM sync_records WHERE status = 'SUCCESS'")
     fun getAverageSyncDuration(): Flow<Long?>
     
     @Insert(onConflict = OnConflictStrategy.REPLACE)

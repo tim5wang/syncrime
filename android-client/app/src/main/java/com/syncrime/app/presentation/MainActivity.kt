@@ -18,6 +18,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.syncrime.app.ai.viewmodel.AIViewModel
 import com.syncrime.app.presentation.viewmodel.HomeViewModel
 import com.syncrime.app.presentation.viewmodel.LibraryViewModel
 import com.syncrime.app.presentation.viewmodel.SearchViewModel
@@ -55,7 +56,8 @@ class MainActivity : ComponentActivity() {
 fun MainScreen(
     homeViewModel: HomeViewModel,
     searchViewModel: SearchViewModel = viewModel(),
-    libraryViewModel: LibraryViewModel = viewModel()
+    libraryViewModel: LibraryViewModel = viewModel(),
+    aiViewModel: AIViewModel = viewModel()
 ) {
     var selectedTab by remember { mutableStateOf(0) }
     val homeState by homeViewModel.uiState.collectAsState()
@@ -96,10 +98,16 @@ fun MainScreen(
                     onClick = { selectedTab = 2 }
                 )
                 NavigationBarItem(
-                    icon = { Icon(Icons.Default.Settings, contentDescription = "设置") },
-                    label = { Text("设置") },
+                    icon = { Icon(Icons.Default.AutoAwesome, contentDescription = "AI") },
+                    label = { Text("AI") },
                     selected = selectedTab == 3,
                     onClick = { selectedTab = 3 }
+                )
+                NavigationBarItem(
+                    icon = { Icon(Icons.Default.Settings, contentDescription = "设置") },
+                    label = { Text("设置") },
+                    selected = selectedTab == 4,
+                    onClick = { selectedTab = 4 }
                 )
             }
         }
@@ -109,7 +117,8 @@ fun MainScreen(
                 0 -> HomeTab(homeState, homeViewModel::refresh)
                 1 -> SearchTab(searchViewModel)
                 2 -> LibraryTab(libraryViewModel)
-                3 -> SettingsTab()
+                3 -> AITab(aiViewModel)
+                4 -> SettingsTab()
             }
         }
     }

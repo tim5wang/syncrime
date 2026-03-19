@@ -47,17 +47,17 @@ object CaptureNotificationManager {
     /**
      * 显示服务启动通知
      */
-    fun showServiceActiveNotification(context: Context) {
-        createNotificationChannel(context)
+    fun showServiceActiveNotification(service: Service) {
+        createNotificationChannel(service)
         
-        val notification = buildBaseNotification(context)
+        val notification = buildBaseNotification(service)
             .setContentTitle("SyncRime 输入采集")
             .setContentText("正在监听输入，提供智能推荐")
             .setSmallIcon(android.R.drawable.ic_input_get)
             .setOngoing(true)
             .build()
         
-        context.startForeground(NOTIFICATION_ID, notification)
+        service.startForeground(NOTIFICATION_ID, notification)
     }
     
     /**
@@ -86,7 +86,7 @@ object CaptureNotificationManager {
         val notification = buildBaseNotification(context)
             .setContentTitle("SyncRime 输入采集已暂停")
             .setContentText("点击恢复采集")
-            .setSmallIcon(android.R.drawable.ic_pause)
+            .setSmallIcon(android.R.drawable.ic_media_pause)
             .setOngoing(true)
             .build()
         

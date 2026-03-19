@@ -50,15 +50,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             getStatisticsUseCase()
                 .catch { e ->
-                    _uiState.update { it.copy(error = e.message) }
+                    _uiState.value = _uiState.value.copy(error = e.message)
                 }
                 .collect { stats ->
-                    _uiState.update { 
-                        it.copy(
-                            isLoading = false,
-                            // 这里可以根据统计数据更新 UI
-                        )
-                    }
+                    _uiState.value = _uiState.value.copy(
+                        isLoading = false
+                        // 这里可以根据统计数据更新 UI
+                    )
                 }
         }
     }
@@ -68,19 +66,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             syncRepository.getLatestSyncRecord()
                 .catch { e -> /* handle error */ }
                 .collect { record ->
-                    record?.let {
-                        val status = when (it.status) {
+                    record?.let { rec ->
+                        val status = when (rec.status) {
                             SyncRecordEntity.SyncStatus.IN_PROGRESS -> SyncStatus.Status.SYNCING
                             SyncRecordEntity.SyncStatus.SUCCESS -> SyncStatus.Status.SUCCESS
                             SyncRecordEntity.SyncStatus.FAILED -> SyncStatus.Status.ERROR
                             else -> SyncStatus.Status.IDLE
                         }
-                        _syncStatus.update { 
-                            SyncStatus(
-                                status = status,
-                                lastSyncTime = it.endTime
-                            )
-                        }
+                        _syncStatus.value = SyncStatus(
+                            status = status,
+                            lastSyncTime = rec.endTime
+                        )
                     }
                 }
         }
@@ -89,9 +85,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun onEvent(event: MainUiEvent) {
         when (event) {
             is MainUiEvent.Refresh -> loadStatistics()
-            is MainUiEvent.ClearError -> _uiState.update { it.copy(error = null) }
+            is MainUiEvent.ClearError -> _uiState.value = _uiState.value.copy(error = null)
             is MainUiEvent.SyncData -> syncData()
-            is MainUiEvent.ShowError -> _uiState.update { it.copy(error = event.message) }
+            is MainUiEvent.ShowError -> _uiState.value = _uiState.value.copy(error = event.message)
         }
     }
     
@@ -111,19 +107,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     application = "示例应用",
                     packageName = "com.example.app"
                 )
-                _uiState.update {
-                    it.copy(
-                        isCapturing = true,
-                        currentSession = InputSession(
-                            id = session.id,
-                            application = session.application,
-                            startTime = session.startTime,
-                            inputCount = session.inputCount
-                        )
+                _uiState.value = _uiState.value.copy(
+                    isCapturing = true,
+                    currentSession = InputSession(
+                        id = session.id,
+                        application = session.application,
+                        startTime = session.startTime,
+                        inputCount = session.inputCount
                     )
-                }
+                )
             } catch (e: Exception) {
-                _uiState.update { it.copy(error = e.message) }
+                _uiState.value = _uiState.value.copy(error = e.message)
             }
         }
     }
@@ -134,14 +128,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 _uiState.value.currentSession?.let { session ->
                     endSessionUseCase(session.id)
                 }
-                _uiState.update {
-                    it.copy(
-                        isCapturing = false,
-                        currentSession = null
-                    )
-                }
+                _uiState.value = _uiState.value.copy(
+                    isCapturing = false,
+                    currentSession = null
+                )
             } catch (e: Exception) {
-                _uiState.update { it.copy(error = e.message) }
+                _uiState.value = _uiState.value.copy(error = e.message)
             }
         }
     }
@@ -156,14 +148,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         application = session.application,
                         characterCount = characterCount
                     )
-                    _uiState.update {
-                        it.copy(
-                            currentSession = session.copy(inputCount = session.inputCount + 1)
-                        )
-                    }
+                    val updatedSession = session.copy(inputCount = session.inputCount + 1)
+                    _uiState.value = _uiState.value.copy(
+                        currentSession = updatedSession
+                    )
                 }
             } catch (e: Exception) {
-                _uiState.update { it.copy(error = e.message) }
+                _uiState.value = _uiState.value.copy(error = e.message)
             }
         }
     }
@@ -171,19 +162,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private fun syncData() {
         viewModelScope.launch {
             try {
-                _syncStatus.update { it.copy(status = SyncStatus.Status.SYNCING) }
+                _syncStatus.value = _syncStatus.value.copy(status = SyncStatus.Status.SYNCING)
                 // TODO: 实现实际同步逻辑
                 // 模拟同步延迟
                 kotlinx.coroutines.delay(1000)
-                _syncStatus.update { 
-                    it.copy(
-                        status = SyncStatus.Status.SUCCESS,
-                        lastSyncTime = System.currentTimeMillis()
-                    )
-                }
+                _syncStatus.value = _syncStatus.value.copy(
+                    status = SyncStatus.Status.SUCCESS,
+                    lastSyncTime = System.currentTimeMillis()
+                )
             } catch (e: Exception) {
-                _syncStatus.update { it.copy(status = SyncStatus.Status.ERROR) }
-                _uiState.update { it.copy(error = e.message) }
+                _syncStatus.value = _syncStatus.value.copy(status = SyncStatus.Status.ERROR)
+                _uiState.value = _uiState.value.copy(error = e.message)
             }
         }
     }

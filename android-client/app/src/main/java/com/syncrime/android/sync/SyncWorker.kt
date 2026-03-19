@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import com.syncrime.android.data.local.database.SyncRimeDatabase
+import com.syncrime.android.data.local.entity.SyncRecordEntity
 import com.syncrime.android.data.repository.InputRepository
 import com.syncrime.android.data.repository.SyncRepository
 import kotlinx.coroutines.flow.first
@@ -49,7 +50,7 @@ class SyncWorker(
             // 4. 更新本地数据库
             
             // 模拟同步过程
-            kotlinx.coroutines.delay(1000 * (runAttemptCount + 1))
+            kotlinx.coroutines.delay(timeMillis = 1000L * (runAttemptCount + 1))
             
             // 标记为已同步
             inputRepository.markSessionsAsSynced(unsyncedSessions.map { it.id })

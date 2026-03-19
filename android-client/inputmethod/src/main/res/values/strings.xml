@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="accessibility_service_title">SyncRime 输入采集</string>
+    <string name="accessibility_service_description">SyncRime 通过无障碍服务监听您的输入内容，自动保存到个人知识库。所有数据仅本地存储，支持智能分类和搜索。您可以随时在设置中关闭此功能。</string>
+</resources>

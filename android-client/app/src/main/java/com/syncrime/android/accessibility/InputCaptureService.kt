@@ -249,9 +249,8 @@ class InputCaptureService : AccessibilityService() {
     private fun getApplicationName(packageName: String): String {
         return try {
             val packageManager = packageManager
-            val appInfo = packageManager.getApplicationLabel(
-                packageManager.getApplicationInfo(packageName, 0)
-            ).toString()
+            val appInfo = packageManager.getApplicationInfo(packageName, 0)
+            packageManager.getApplicationLabel(appInfo).toString()
         } catch (e: Exception) {
             packageName
         }
