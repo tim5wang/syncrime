@@ -1,0 +1,14 @@
+# SyncRime Android SDK 配置
+# 请根据实际情况修改 ANDROID_HOME 路径
+
+# Linux 常见位置:
+# /home/username/Android/Sdk
+# /opt/android-sdk
+
+# macOS 常见位置:
+# /Users/username/Library/Android/sdk
+
+# Windows 常见位置:
+# C:\\Users\\Username\\AppData\\Local\\Android\\Sdk
+
+sdk.dir=/home/tim/Android/Sdk

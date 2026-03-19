@@ -35,8 +35,8 @@ android {
         }
         
         release {
-            minifyEnabled = true
-            shrinkResources = true
+            isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -51,6 +51,10 @@ android {
 
     kotlinOptions {
         jvmTarget = "1.8"
+        freeCompilerArgs += listOf(
+            "-opt-in=androidx.compose.material3.ExperimentalMaterial3Api",
+            "-opt-in=androidx.compose.material.ExperimentalMaterialApi"
+        )
     }
 
     buildFeatures {
@@ -62,7 +66,7 @@ android {
         kotlinCompilerExtensionVersion = "1.5.10"
     }
 
-    packagingOptions {
+    packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
@@ -70,12 +74,16 @@ android {
 
     testOptions {
         unitTests {
-            includeAndroidResources = true
+            isIncludeAndroidResources = true
         }
     }
 }
 
 dependencies {
+    // 项目模块依赖 (暂时注释，等待模块配置修复)
+    // implementation(project(":shared"))
+    // implementation(project(":inputmethod"))
+    
     // Compose BOM
     implementation(platform("androidx.compose:compose-bom:2023.10.01"))
     implementation("androidx.compose.ui:ui")

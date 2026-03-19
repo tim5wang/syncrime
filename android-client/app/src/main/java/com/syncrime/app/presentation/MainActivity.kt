@@ -24,6 +24,7 @@ import com.syncrime.app.presentation.viewmodel.LibraryViewModel
 import com.syncrime.app.presentation.viewmodel.SearchViewModel
 import com.syncrime.app.ui.theme.SyncRimeTheme
 import com.syncrime.shared.model.KnowledgeClip
+import com.syncrime.shared.model.InputRecord
 
 /**
  * 主活动
@@ -217,7 +218,6 @@ fun HomeTab(homeState: HomeViewModel.HomeUiState, onRefresh: () -> Unit) {
 @Composable
 fun SearchTab(searchViewModel: SearchViewModel) {
     val uiState by searchViewModel.uiState.collectAsState()
-    var searchText by remember { mutableStateOf("") }
     
     Column(
         modifier = Modifier
@@ -233,6 +233,7 @@ fun SearchTab(searchViewModel: SearchViewModel) {
         Spacer(modifier = Modifier.height(16.dp))
         
         // 搜索框
+        var searchText by remember { mutableStateOf("") }
         OutlinedTextField(
             value = searchText,
             onValueChange = { searchText = it },
@@ -246,12 +247,7 @@ fun SearchTab(searchViewModel: SearchViewModel) {
                     }
                 }
             },
-            singleLine = true,
-            onAction = {
-                if (searchText.isNotEmpty()) {
-                    searchViewModel.search(searchText)
-                }
-            }
+            singleLine = true
         )
         
         Spacer(modifier = Modifier.height(8.dp))
@@ -373,7 +369,7 @@ fun InputRecordItem(record: com.syncrime.shared.model.InputRecord) {
                     color = MaterialTheme.colorScheme.primary
                 )
                 Text(
-                    text = record.timestamp.toString().take(10),
+                    text = record.createdAt.toString().take(10),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -385,11 +381,11 @@ fun InputRecordItem(record: com.syncrime.shared.model.InputRecord) {
                 maxLines = 3,
                 overflow = TextOverflow.Ellipsis
             )
-            if (record.category.isNotEmpty()) {
+            if (!record.category.isNullOrEmpty()) {
                 Spacer(modifier = Modifier.height(4.dp))
                 AssistChip(
                     onClick = { },
-                    label = { Text(record.category) }
+                    label = { Text(record.category ?: "") }
                 )
             }
         }
@@ -489,7 +485,7 @@ fun LibraryTab(libraryViewModel: LibraryViewModel) {
                         fontWeight = FontWeight.Bold
                     )
                 }
-                HorizontalDivider(modifier = Modifier.height(40.dp), thickness = 1.dp)
+                Divider(modifier = Modifier.height(40.dp), thickness = 1.dp)
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text("今日新增", style = MaterialTheme.typography.bodySmall)
                     Text(
@@ -683,7 +679,7 @@ fun SettingsTab() {
                             )
                         }
                         
-                        HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+                        Divider(modifier = Modifier.padding(vertical = 8.dp))
                         
                         // 隐私过滤开关
                         var privacyFilter by remember { mutableStateOf(true) }

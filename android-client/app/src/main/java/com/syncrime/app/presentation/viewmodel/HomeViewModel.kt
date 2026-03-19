@@ -4,8 +4,8 @@ import android.app.Application
 import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.syncrime.inputmethod.core.CaptureStats
-import com.syncrime.inputmethod.core.InputCaptureService
+// import com.syncrime.inputmethod.core.CaptureStats
+// import com.syncrime.inputmethod.core.InputCaptureService
 import com.syncrime.inputmethod.repository.InputRepository
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -20,7 +20,9 @@ private const val TAG = "HomeViewModel"
  */
 class HomeViewModel(application: Application) : AndroidViewModel(application) {
     
-    private val inputRepository = application.inputRepository
+    private val inputRepository = InputRepository(
+        com.syncrime.shared.data.local.AppDatabase.getDatabase(application).inputDao()
+    )
     
     // UI 状态
     data class HomeUiState(
@@ -73,31 +75,16 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     }
     
     /**
-     * 观察服务状态
+     * 观察服务状态 (暂时简化)
      */
     private fun observeServiceStatus() {
         viewModelScope.launch {
-            flow {
-                while (isActive) {  // 添加 isActive 检查，防止内存泄漏
-                    val service = InputCaptureService.getInstance()
-                    val stats = service?.getStats() ?: CaptureStats(
-                        isRunning = false,
-                        sessionId = 0,
-                        currentApp = null,
-                        totalInputs = 0
-                    )
-                    emit(stats)
-                    kotlinx.coroutines.delay(1000) // 每秒更新
-                }
-            }.catch { e ->
-                Log.e(TAG, "观察服务状态失败", e)
-            }.collect { stats ->
-                _uiState.value = _uiState.value.copy(
-                    isServiceRunning = stats.isRunning,
-                    currentApp = stats.currentApp,
-                    sessionId = if (stats.sessionId > 0) stats.sessionId else null
-                )
-            }
+            // 暂时返回静态状态，后续完善
+            _uiState.value = _uiState.value.copy(
+                isServiceRunning = false,
+                currentApp = null,
+                sessionId = null
+            )
         }
     }
     
