@@ -32,7 +32,7 @@
         
         <!-- Accessibility Service for Input Capture -->
         <service
-            android:name=".accessibility.InputCaptureService"
+            android:name="com.syncrime.android.accessibility.InputCaptureService"
             android:exported="false"
             android:label="@string/accessibility_service_title"
             android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
