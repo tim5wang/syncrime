@@ -1,5 +1,7 @@
 package com.syncrime.app.presentation
 
+import android.content.Context
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -14,6 +16,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -596,6 +599,7 @@ fun LibraryTab(libraryViewModel: LibraryViewModel) {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsTab() {
+    val context = LocalContext.current
     var expanded by remember { mutableStateOf(false) }
     
     Column(
@@ -632,9 +636,51 @@ fun SettingsTab() {
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        
+                        // 状态提示
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.tertiaryContainer
+                            )
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(12.dp),
+                                horizontalArrangement = Arrangement.Center
+                            ) {
+                                Icon(
+                                    Icons.Default.Info,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onTertiaryContainer,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "开启后请在系统设置中找到 SyncRime 并启用",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onTertiaryContainer
+                                )
+                            }
+                        }
+                        
                         Spacer(modifier = Modifier.height(12.dp))
+                        
                         Button(
-                            onClick = { /* TODO: 打开无障碍设置 */ },
+                            onClick = {
+                                try {
+                                    val intent = android.content.Intent(android.provider.Settings.ACTION_ACCESSIBILITY_SETTINGS)
+                                    context.startActivity(intent)
+                                } catch (e: Exception) {
+                                    // 如果失败，尝试备用方案
+                                    try {
+                                        val intent = android.content.Intent(android.provider.Settings.ACTION_SETTINGS)
+                                        context.startActivity(intent)
+                                    } catch (e2: Exception) {
+                                        // 无法打开设置
+                                    }
+                                }
+                            },
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Icon(Icons.Default.SettingsAccessibility, contentDescription = null, modifier = Modifier.size(18.dp))
