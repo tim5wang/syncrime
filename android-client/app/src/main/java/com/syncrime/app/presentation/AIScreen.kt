@@ -115,7 +115,6 @@ val AIMode.displayName: String
 @Composable
 fun AISettingsCard(aiViewModel: AIViewModel) {
     var showDialog by remember { mutableStateOf(false) }
-    var apiKey by remember { mutableStateOf("") }
     
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -124,27 +123,60 @@ fun AISettingsCard(aiViewModel: AIViewModel) {
         )
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
-            Row(
+            Text(
+                text = "⚙️ 配置 AI 服务",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = "需要阿里云百炼 API Key 才能使用 AI 功能",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onPrimaryContainer
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+            
+            // 快速指南
+            Card(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant
+                )
             ) {
-                Column(modifier = Modifier.weight(1f)) {
+                Column(modifier = Modifier.padding(12.dp)) {
                     Text(
-                        text = "⚙️ 配置 AI 服务",
-                        style = MaterialTheme.typography.titleMedium,
+                        text = "📝 如何获取 API Key：",
+                        style = MaterialTheme.typography.labelMedium,
                         fontWeight = FontWeight.Bold
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = "需要阿里云百炼 API Key 才能使用 AI 功能",
+                        text = "1. 访问阿里云百炼控制台",
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        text = "2. 创建/选择应用",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        text = "3. 复制 API Key 并粘贴到这里",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
-                Button(onClick = { showDialog = true }) {
-                    Text("配置")
-                }
+            }
+            
+            Spacer(modifier = Modifier.height(12.dp))
+            
+            Button(
+                onClick = { showDialog = true },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Icon(Icons.Default.Key, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("配置 API Key")
             }
         }
     }
