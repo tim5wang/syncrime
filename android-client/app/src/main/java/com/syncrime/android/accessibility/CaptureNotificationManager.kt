@@ -10,7 +10,7 @@ import android.content.Intent
 import android.os.Build
 import androidx.core.app.NotificationCompat
 import com.syncrime.android.R
-import com.syncrime.android.presentation.MainActivity
+import com.syncrime.app.presentation.MainActivity
 
 /**
  * 采集通知管理器

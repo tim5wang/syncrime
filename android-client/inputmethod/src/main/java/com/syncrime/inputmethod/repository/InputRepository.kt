@@ -3,6 +3,7 @@ package com.syncrime.inputmethod.repository
 import com.syncrime.shared.data.local.dao.InputDao
 import com.syncrime.shared.model.InputRecord
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
 
 /**
  * 输入记录仓库
@@ -68,13 +69,17 @@ class InputRepository(
     }
     
     /**
-     * 获取今日统计
+     * 获取今日输入数量
      */
-    fun getTodayStats(): Flow<TodayStats> {
-        return inputDao.getTodayCount().let { flow ->
-            // 这里可以组合多个 Flow
-            flow
-        }
+    fun getTodayCount(): Flow<Int> {
+        return inputDao.getTodayCount()
+    }
+    
+    /**
+     * 获取总数量
+     */
+    fun getTotalCount(): Flow<Int> {
+        return inputDao.getTotalCount()
     }
     
     /**
@@ -85,17 +90,16 @@ class InputRepository(
     }
     
     /**
+     * 删除旧记录
+     */
+    suspend fun deleteOldRecords(timestamp: Long): Int {
+        return inputDao.deleteBefore(timestamp)
+    }
+    
+    /**
      * 清空所有记录
      */
     suspend fun deleteAllRecords() {
         inputDao.deleteAll()
     }
 }
-
-/**
- * 今日统计
- */
-data class TodayStats(
-    val count: Int,
-    val appStats: List<InputDao.AppStat>
-)

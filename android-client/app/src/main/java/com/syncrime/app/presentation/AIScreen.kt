@@ -1,5 +1,9 @@
 package com.syncrime.app.presentation
 
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
+import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -16,6 +20,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -630,6 +635,8 @@ fun AIResultCard(
     onCopy: () -> Unit,
     onClear: () -> Unit
 ) {
+    val context = LocalContext.current
+    
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
@@ -649,7 +656,13 @@ fun AIResultCard(
                     color = MaterialTheme.colorScheme.onTertiaryContainer
                 )
                 Row {
-                    IconButton(onClick = onCopy) {
+                    IconButton(onClick = {
+                        // 复制到剪贴板
+                        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                        val clip = ClipData.newPlainText("AI Result", result)
+                        clipboard.setPrimaryClip(clip)
+                        Toast.makeText(context, "已复制到剪贴板", Toast.LENGTH_SHORT).show()
+                    }) {
                         Icon(
                             Icons.Default.ContentCopy,
                             contentDescription = "复制",

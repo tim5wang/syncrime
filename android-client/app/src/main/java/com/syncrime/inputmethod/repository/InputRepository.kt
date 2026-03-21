@@ -68,14 +68,14 @@ class InputRepository(
     }
     
     /**
-     * 获取今日统计
+     * 获取今日输入数量
      */
-    fun getTodayStats(): Flow<Int> {
+    fun getTodayCount(): Flow<Int> {
         return inputDao.getTodayCount()
     }
     
     /**
-     * 获取总统计
+     * 获取总数量
      */
     fun getTotalCount(): Flow<Int> {
         return inputDao.getTotalCount()
@@ -89,17 +89,16 @@ class InputRepository(
     }
     
     /**
+     * 删除旧记录
+     */
+    suspend fun deleteOldRecords(timestamp: Long): Int {
+        return inputDao.deleteBefore(timestamp)
+    }
+    
+    /**
      * 清空所有记录
      */
     suspend fun deleteAllRecords() {
         inputDao.deleteAll()
     }
 }
-
-/**
- * 今日统计
- */
-data class TodayStats(
-    val count: Int,
-    val appStats: List<InputDao.AppStat>
-)

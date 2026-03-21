@@ -18,7 +18,8 @@
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
-        android:theme="@style/Theme.SyncRime">
+        android:theme="@style/Theme.SyncRime"
+        android:enableOnBackInvokedCallback="true">
 
         <activity
             android:name=".presentation.MainActivity"
@@ -29,6 +30,13 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+        
+        <!-- Debug Log Viewer Activity -->
+        <activity
+            android:name=".presentation.DebugLogViewerActivity"
+            android:exported="false"
+            android:label="日志查看器"
+            android:theme="@style/Theme.SyncRime" />
         
         <!-- Accessibility Service for Input Capture -->
         <service
@@ -43,6 +51,17 @@
                 android:name="android.accessibilityservice"
                 android:resource="@xml/accessibility_service_config" />
         </service>
+        
+        <!-- FileProvider for data export -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
 
     </application>
 

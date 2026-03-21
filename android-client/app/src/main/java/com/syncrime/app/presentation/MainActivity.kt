@@ -2,6 +2,7 @@ package com.syncrime.app.presentation
 
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -22,10 +23,15 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.syncrime.app.ai.viewmodel.AIViewModel
+import com.syncrime.app.ai.viewmodel.AIViewModelFactory
+import com.syncrime.app.presentation.components.DebugFloatingButton
 import com.syncrime.app.presentation.viewmodel.HomeViewModel
 import com.syncrime.app.presentation.viewmodel.LibraryViewModel
 import com.syncrime.app.presentation.viewmodel.SearchViewModel
+import com.syncrime.app.presentation.viewmodel.SearchViewModelFactory
+import com.syncrime.app.presentation.viewmodel.SettingsViewModel
 import com.syncrime.app.ui.theme.SyncRimeTheme
+import com.syncrime.shared.data.local.AppDatabase
 import com.syncrime.shared.model.KnowledgeClip
 import com.syncrime.shared.model.InputRecord
 
@@ -59,40 +65,54 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun MainScreen(
     homeViewModel: HomeViewModel,
-    searchViewModel: SearchViewModel = viewModel(),
+    searchViewModel: SearchViewModel = viewModel(
+        factory = SearchViewModelFactory(
+            AppDatabase.getDatabase(LocalContext.current).inputDao().let { 
+                com.syncrime.inputmethod.repository.InputRepository(it) 
+            },
+            AppDatabase.getDatabase(LocalContext.current).clipDao().let {
+                com.syncrime.inputmethod.repository.ClipRepository(it)
+            },
+            LocalContext.current.applicationContext as android.app.Application
+        )
+    ),
     libraryViewModel: LibraryViewModel = viewModel(),
-    aiViewModel: AIViewModel = viewModel()
+    aiViewModel: AIViewModel = viewModel(
+        factory = AIViewModelFactory(LocalContext.current.applicationContext as android.app.Application)
+    )
 ) {
     var selectedTab by remember { mutableStateOf(0) }
     val homeState by homeViewModel.uiState.collectAsState()
     
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { 
-                    Text(
-                        "SyncRime",
-                        fontWeight = FontWeight.Bold
-                    ) 
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer,
-                    titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
+    // Debug 悬浮按钮的 Box 包装
+    Box(modifier = Modifier.fillMaxSize()) {
+        Scaffold(
+            topBar = {
+                TopAppBar(
+                    title = { 
+                        Text(
+                            "SyncRime",
+                            fontWeight = FontWeight.Bold
+                        ) 
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.primaryContainer,
+                        titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
                 )
-            )
-        },
-        bottomBar = {
-            NavigationBar {
-                NavigationBarItem(
-                    icon = { Icon(Icons.Default.Home, contentDescription = "首页") },
-                    label = { Text("首页") },
-                    selected = selectedTab == 0,
-                    onClick = { selectedTab = 0 }
-                )
-                NavigationBarItem(
-                    icon = { Icon(Icons.Default.Search, contentDescription = "搜索") },
-                    label = { Text("搜索") },
-                    selected = selectedTab == 1,
+            },
+            bottomBar = {
+                NavigationBar {
+                    NavigationBarItem(
+                        icon = { Icon(Icons.Default.Home, contentDescription = "首页") },
+                        label = { Text("首页") },
+                        selected = selectedTab == 0,
+                        onClick = { selectedTab = 0 }
+                    )
+                    NavigationBarItem(
+                        icon = { Icon(Icons.Default.Search, contentDescription = "搜索") },
+                        label = { Text("搜索") },
+                        selected = selectedTab == 1,
                     onClick = { selectedTab = 1 }
                 )
                 NavigationBarItem(
@@ -114,17 +134,26 @@ fun MainScreen(
                     onClick = { selectedTab = 4 }
                 )
             }
-        }
-    ) { paddingValues ->
-        Box(modifier = Modifier.padding(paddingValues)) {
-            when (selectedTab) {
-                0 -> HomeTab(homeState, homeViewModel::refresh)
-                1 -> SearchTab(searchViewModel)
-                2 -> LibraryTab(libraryViewModel)
-                3 -> AITab(aiViewModel)
-                4 -> SettingsTab()
+        },
+        content = { innerPadding ->
+            Box(modifier = Modifier.padding(innerPadding)) {
+                when (selectedTab) {
+                    0 -> HomeTab(homeState, onRefresh = { homeViewModel.refresh() })
+                    1 -> SearchTab(searchViewModel)
+                    2 -> LibraryTab(libraryViewModel)
+                    3 -> AITab(aiViewModel)
+                    4 -> SettingsTab()
+                }
             }
         }
+    )
+    
+        // Debug 悬浮按钮
+        DebugFloatingButton(
+            onClearCache = {
+                // 清理缓存后的回调
+            }
+        )
     }
 }
 
@@ -221,6 +250,7 @@ fun HomeTab(homeState: HomeViewModel.HomeUiState, onRefresh: () -> Unit) {
 @Composable
 fun SearchTab(searchViewModel: SearchViewModel) {
     val uiState by searchViewModel.uiState.collectAsState()
+    var searchText by remember { mutableStateOf(uiState.query) }
     
     Column(
         modifier = Modifier
@@ -236,16 +266,21 @@ fun SearchTab(searchViewModel: SearchViewModel) {
         Spacer(modifier = Modifier.height(16.dp))
         
         // 搜索框
-        var searchText by remember { mutableStateOf("") }
         OutlinedTextField(
             value = searchText,
-            onValueChange = { searchText = it },
+            onValueChange = { 
+                searchText = it
+                searchViewModel.setQuery(it)
+            },
             modifier = Modifier.fillMaxWidth(),
             label = { Text("搜索关键词") },
             leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
             trailingIcon = {
                 if (searchText.isNotEmpty()) {
-                    IconButton(onClick = { searchText = "" }) {
+                    IconButton(onClick = { 
+                        searchText = ""
+                        searchViewModel.clearSearch()
+                    }) {
                         Icon(Icons.Default.Clear, contentDescription = "清除")
                     }
                 }
@@ -269,13 +304,15 @@ fun SearchTab(searchViewModel: SearchViewModel) {
                 Spacer(modifier = Modifier.width(8.dp))
                 Text("搜索中...")
             } else {
+                Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(modifier = Modifier.width(8.dp))
                 Text("搜索")
             }
         }
         
         Spacer(modifier = Modifier.height(16.dp))
         
-        // 搜索结果
+        // 搜索内容区域
         when {
             uiState.isSearching -> {
                 Box(
@@ -289,16 +326,82 @@ fun SearchTab(searchViewModel: SearchViewModel) {
                     }
                 }
             }
+            uiState.showHistory && uiState.searchHistory.isNotEmpty() -> {
+                // 搜索历史
+                Column {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "🕐 搜索历史",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                        TextButton(onClick = { searchViewModel.clearSearchHistory() }) {
+                            Text("清空")
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        items(uiState.searchHistory) { historyItem ->
+                            Card(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { 
+                                        searchText = historyItem
+                                        searchViewModel.selectFromHistory(historyItem)
+                                    },
+                                colors = CardDefaults.cardColors(
+                                    containerColor = MaterialTheme.colorScheme.surfaceVariant
+                                )
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(12.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        Icons.Default.History,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(12.dp))
+                                    Text(
+                                        text = historyItem,
+                                        style = MaterialTheme.typography.bodyMedium
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
             !uiState.hasSearched -> {
                 Box(
                     modifier = Modifier.fillMaxSize(),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(
-                        text = "输入关键词开始搜索",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Icon(
+                            Icons.Default.Search,
+                            contentDescription = null,
+                            modifier = Modifier.size(48.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "输入关键词开始搜索",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
             }
             uiState.inputResults.isEmpty() && uiState.clipResults.isEmpty() -> {
@@ -306,11 +409,20 @@ fun SearchTab(searchViewModel: SearchViewModel) {
                     modifier = Modifier.fillMaxSize(),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(
-                        text = "未找到相关结果",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Icon(
+                            Icons.Default.SearchOff,
+                            contentDescription = null,
+                            modifier = Modifier.size(48.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "未找到相关结果",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
             }
             else -> {
@@ -328,7 +440,7 @@ fun SearchTab(searchViewModel: SearchViewModel) {
                             )
                         }
                         items(uiState.inputResults) { record ->
-                            InputRecordItem(record)
+                            InputRecordItem(record, searchQuery = uiState.query)
                         }
                     }
                     
@@ -342,7 +454,7 @@ fun SearchTab(searchViewModel: SearchViewModel) {
                             )
                         }
                         items(uiState.clipResults) { clip ->
-                            KnowledgeClipItem(clip)
+                            KnowledgeClipItem(clip, searchQuery = uiState.query)
                         }
                     }
                 }
@@ -355,11 +467,16 @@ fun SearchTab(searchViewModel: SearchViewModel) {
  * 输入记录列表项
  */
 @Composable
-fun InputRecordItem(record: com.syncrime.shared.model.InputRecord) {
+fun InputRecordItem(
+    record: com.syncrime.shared.model.InputRecord,
+    searchQuery: String = ""
+) {
+    var showDetail by remember { mutableStateOf(false) }
+    
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { /* TODO: 查看详情 */ }
+            .clickable { showDetail = true }
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
             Row(
@@ -372,14 +489,14 @@ fun InputRecordItem(record: com.syncrime.shared.model.InputRecord) {
                     color = MaterialTheme.colorScheme.primary
                 )
                 Text(
-                    text = record.createdAt.toString().take(10),
+                    text = formatTimestamp(record.createdAt),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
             Spacer(modifier = Modifier.height(4.dp))
             Text(
-                text = record.content,
+                text = highlightText(record.content, searchQuery),
                 style = MaterialTheme.typography.bodyMedium,
                 maxLines = 3,
                 overflow = TextOverflow.Ellipsis
@@ -393,17 +510,30 @@ fun InputRecordItem(record: com.syncrime.shared.model.InputRecord) {
             }
         }
     }
+    
+    // 详情对话框
+    if (showDetail) {
+        InputRecordDetailDialog(
+            record = record,
+            onDismiss = { showDetail = false }
+        )
+    }
 }
 
 /**
  * 知识剪藏列表项
  */
 @Composable
-fun KnowledgeClipItem(clip: KnowledgeClip) {
+fun KnowledgeClipItem(
+    clip: KnowledgeClip,
+    searchQuery: String = ""
+) {
+    var showDetail by remember { mutableStateOf(false) }
+    
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { /* TODO: 查看详情 */ }
+            .clickable { showDetail = true }
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
             Row(
@@ -416,7 +546,7 @@ fun KnowledgeClipItem(clip: KnowledgeClip) {
                     color = MaterialTheme.colorScheme.primary
                 )
                 Text(
-                    text = clip.createdAt.toString().take(10),
+                    text = formatTimestamp(clip.createdAt),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -429,7 +559,7 @@ fun KnowledgeClipItem(clip: KnowledgeClip) {
             )
             Spacer(modifier = Modifier.height(4.dp))
             Text(
-                text = clip.content,
+                text = highlightText(clip.content, searchQuery),
                 style = MaterialTheme.typography.bodyMedium,
                 maxLines = 3,
                 overflow = TextOverflow.Ellipsis
@@ -448,6 +578,180 @@ fun KnowledgeClipItem(clip: KnowledgeClip) {
             }
         }
     }
+    
+    // 详情对话框
+    if (showDetail) {
+        KnowledgeClipDetailDialog(
+            clip = clip,
+            onDismiss = { showDetail = false }
+        )
+    }
+}
+
+/**
+ * 输入记录详情对话框
+ */
+@Composable
+fun InputRecordDetailDialog(
+    record: com.syncrime.shared.model.InputRecord,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { 
+            Text(
+                text = record.application.substringAfterLast(".").ifEmpty { "输入记录" },
+                fontWeight = FontWeight.Bold
+            )
+        },
+        text = {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text(
+                    text = "时间: ${formatTimestamp(record.createdAt)}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                if (!record.category.isNullOrEmpty()) {
+                    Text(
+                        text = "分类: ${record.category}",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+                Divider()
+                Text(
+                    text = "内容:",
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = record.content,
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text("关闭")
+            }
+        }
+    )
+}
+
+/**
+ * 知识剪藏详情对话框
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun KnowledgeClipDetailDialog(
+    clip: KnowledgeClip,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { 
+            Text(
+                text = clip.title.ifEmpty { "知识剪藏" },
+                fontWeight = FontWeight.Bold
+            )
+        },
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 400.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                // 元信息
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    Text(
+                        text = "来源: ${clip.sourceType.name}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        text = "时间: ${formatTimestamp(clip.createdAt)}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                
+                // 标签
+                if (clip.tags.isNotEmpty()) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        clip.tags.forEach { tag ->
+                            SuggestionChip(
+                                onClick = { },
+                                label = { Text("#$tag") }
+                            )
+                        }
+                    }
+                }
+                
+                Divider()
+                
+                // 内容
+                Text(
+                    text = "内容:",
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = clip.content,
+                    style = MaterialTheme.typography.bodyMedium
+                )
+                
+                // 统计
+                if (clip.viewCount > 0 || clip.favoriteCount > 0) {
+                    Divider()
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        Text(
+                            text = "👁 查看: ${clip.viewCount}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Text(
+                            text = "⭐ 收藏: ${clip.favoriteCount}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text("关闭")
+            }
+        }
+    )
+}
+
+/**
+ * 格式化时间戳
+ */
+fun formatTimestamp(timestamp: Long): String {
+    val sdf = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", java.util.Locale.getDefault())
+    return sdf.format(java.util.Date(timestamp))
+}
+
+/**
+ * 高亮显示搜索关键词（简化版，返回原文本）
+ * 实际高亮需要使用 AnnotatedString
+ */
+fun highlightText(text: String, query: String): String {
+    return text
 }
 
 /**
@@ -598,9 +902,21 @@ fun LibraryTab(libraryViewModel: LibraryViewModel) {
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SettingsTab() {
+fun SettingsTab(settingsViewModel: SettingsViewModel = viewModel()) {
     val context = LocalContext.current
-    var expanded by remember { mutableStateOf(false) }
+    val uiState by settingsViewModel.uiState.collectAsState()
+    var showCleanupConfirm by remember { mutableStateOf(false) }
+    var showExportSuccess by remember { mutableStateOf(false) }
+    var exportUri by remember { mutableStateOf<android.net.Uri?>(null) }
+    var showLoginDialog by remember { mutableStateOf(false) }
+    var isRegisterMode by remember { mutableStateOf(false) }
+    
+    // 显示消息提示
+    LaunchedEffect(uiState.message) {
+        uiState.message?.let {
+            // 可以添加 Snackbar 或 Toast
+        }
+    }
     
     Column(
         modifier = Modifier
@@ -619,6 +935,76 @@ fun SettingsTab() {
             modifier = Modifier.fillMaxSize(),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
+            // 用户账户
+            item {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = if (uiState.isLoggedIn) 
+                            MaterialTheme.colorScheme.primaryContainer 
+                        else 
+                            MaterialTheme.colorScheme.surfaceVariant
+                    )
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    if (uiState.isLoggedIn) Icons.Default.AccountCircle else Icons.Default.PersonOutline,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(40.dp),
+                                    tint = if (uiState.isLoggedIn) 
+                                        MaterialTheme.colorScheme.onPrimaryContainer 
+                                    else 
+                                        MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Column {
+                                    Text(
+                                        text = if (uiState.isLoggedIn) uiState.userNickname ?: "用户" else "未登录",
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    if (uiState.isLoggedIn) {
+                                        Text(
+                                            text = uiState.userEmail ?: "",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                                        )
+                                    }
+                                }
+                            }
+                            
+                            if (uiState.isLoggedIn) {
+                                TextButton(onClick = { settingsViewModel.logout() }) {
+                                    Text("退出")
+                                }
+                            } else {
+                                Button(onClick = { showLoginDialog = true }) {
+                                    Text("登录")
+                                }
+                            }
+                        }
+                        
+                        // 云同步状态
+                        if (uiState.isLoggedIn) {
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text("☁️ 云同步已启用", style = MaterialTheme.typography.bodySmall)
+                                Text("已连接", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
+                            }
+                        }
+                    }
+                }
+            }
+            
             // Debug 日志查看器
             item {
                 Card(
@@ -647,7 +1033,10 @@ fun SettingsTab() {
                                 color = MaterialTheme.colorScheme.onErrorContainer
                             )
                         }
-                        IconButton(onClick = { /* TODO: 打开日志查看器 */ }) {
+                        IconButton(onClick = { 
+                            val intent = Intent(context, DebugLogViewerActivity::class.java)
+                            context.startActivity(intent)
+                        }) {
                             Icon(
                                 Icons.Default.BugReport,
                                 contentDescription = "查看日志",
@@ -711,7 +1100,6 @@ fun SettingsTab() {
                                     val intent = android.content.Intent(android.provider.Settings.ACTION_ACCESSIBILITY_SETTINGS)
                                     context.startActivity(intent)
                                 } catch (e: Exception) {
-                                    // 如果失败，尝试备用方案
                                     try {
                                         val intent = android.content.Intent(android.provider.Settings.ACTION_SETTINGS)
                                         context.startActivity(intent)
@@ -744,7 +1132,6 @@ fun SettingsTab() {
                         Spacer(modifier = Modifier.height(12.dp))
                         
                         // 自动保存开关
-                        var autoSave by remember { mutableStateOf(true) }
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
@@ -759,15 +1146,14 @@ fun SettingsTab() {
                                 )
                             }
                             Switch(
-                                checked = autoSave,
-                                onCheckedChange = { autoSave = it }
+                                checked = uiState.autoSave,
+                                onCheckedChange = { settingsViewModel.setAutoSave(it) }
                             )
                         }
                         
                         Divider(modifier = Modifier.padding(vertical = 8.dp))
                         
                         // 隐私过滤开关
-                        var privacyFilter by remember { mutableStateOf(true) }
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
@@ -782,8 +1168,8 @@ fun SettingsTab() {
                                 )
                             }
                             Switch(
-                                checked = privacyFilter,
-                                onCheckedChange = { privacyFilter = it }
+                                checked = uiState.privacyFilter,
+                                onCheckedChange = { settingsViewModel.setPrivacyFilter(it) }
                             )
                         }
                     }
@@ -803,6 +1189,26 @@ fun SettingsTab() {
                         )
                         Spacer(modifier = Modifier.height(12.dp))
                         
+                        // 清理天数设置
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("保留天数: ${uiState.cleanupDays} 天")
+                            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                listOf(7, 14, 30, 60).forEach { days ->
+                                    FilterChip(
+                                        selected = uiState.cleanupDays == days,
+                                        onClick = { settingsViewModel.setCleanupDays(days) },
+                                        label = { Text("$days") }
+                                    )
+                                }
+                            }
+                        }
+                        
+                        Spacer(modifier = Modifier.height(12.dp))
+                        
                         // 数据清理
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -812,13 +1218,30 @@ fun SettingsTab() {
                             Column(modifier = Modifier.weight(1f)) {
                                 Text("清理旧数据")
                                 Text(
-                                    text = "删除 30 天前的输入记录",
+                                    text = "删除 ${uiState.cleanupDays} 天前的输入记录",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
+                                uiState.lastCleanupTime?.let {
+                                    Text(
+                                        text = "上次清理: $it",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                }
                             }
-                            OutlinedButton(onClick = { /* TODO: 清理数据 */ }) {
-                                Text("清理")
+                            OutlinedButton(
+                                onClick = { showCleanupConfirm = true },
+                                enabled = !uiState.isCleaning
+                            ) {
+                                if (uiState.isCleaning) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(16.dp),
+                                        strokeWidth = 2.dp
+                                    )
+                                } else {
+                                    Text("清理")
+                                }
                             }
                         }
                         
@@ -826,12 +1249,38 @@ fun SettingsTab() {
                         
                         // 导出数据
                         OutlinedButton(
-                            onClick = { /* TODO: 导出数据 */ },
-                            modifier = Modifier.fillMaxWidth()
+                            onClick = { 
+                                exportUri = settingsViewModel.exportData()
+                                if (exportUri != null) {
+                                    showExportSuccess = true
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            enabled = !uiState.isExporting
                         ) {
-                            Icon(Icons.Default.Download, contentDescription = null, modifier = Modifier.size(18.dp))
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text("导出数据")
+                            if (uiState.isExporting) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(16.dp),
+                                    strokeWidth = 2.dp
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("导出中...")
+                            } else {
+                                Icon(Icons.Default.Download, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("导出数据")
+                            }
+                        }
+                        
+                        // 显示消息
+                        uiState.message?.let { message ->
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                text = message,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = if (message.contains("成功")) MaterialTheme.colorScheme.primary 
+                                       else MaterialTheme.colorScheme.error
+                            )
                         }
                     }
                 }
@@ -872,7 +1321,18 @@ fun SettingsTab() {
                         }
                         Spacer(modifier = Modifier.height(12.dp))
                         OutlinedButton(
-                            onClick = { /* TODO: 检查更新 */ },
+                            onClick = { 
+                                // 打开 GitHub 或官网
+                                try {
+                                    val intent = android.content.Intent(
+                                        android.content.Intent.ACTION_VIEW,
+                                        android.net.Uri.parse("https://github.com/syncrime/syncrime-android")
+                                    )
+                                    context.startActivity(intent)
+                                } catch (e: Exception) {
+                                    // 无法打开
+                                }
+                            },
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Icon(Icons.Default.Update, contentDescription = null, modifier = Modifier.size(18.dp))
@@ -889,4 +1349,166 @@ fun SettingsTab() {
             }
         }
     }
+    
+    // 清理确认对话框
+    if (showCleanupConfirm) {
+        AlertDialog(
+            onDismissRequest = { showCleanupConfirm = false },
+            title = { Text("确认清理") },
+            text = { Text("确定要删除 ${uiState.cleanupDays} 天前的数据吗？此操作不可恢复。") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showCleanupConfirm = false
+                        settingsViewModel.cleanupOldData()
+                    }
+                ) {
+                    Text("确认清理")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showCleanupConfirm = false }) {
+                    Text("取消")
+                }
+            }
+        )
+    }
+    
+    // 导出成功提示
+    if (showExportSuccess && exportUri != null) {
+        AlertDialog(
+            onDismissRequest = { 
+                showExportSuccess = false
+                settingsViewModel.clearMessage()
+            },
+            title = { Text("导出成功") },
+            text = { Text("数据已导出到临时文件，是否分享？") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showExportSuccess = false
+                        try {
+                            val shareIntent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                                type = "application/json"
+                                putExtra(android.content.Intent.EXTRA_STREAM, exportUri)
+                                addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                            }
+                            context.startActivity(android.content.Intent.createChooser(shareIntent, "分享导出数据"))
+                        } catch (e: Exception) {
+                            // 分享失败
+                        }
+                    }
+                ) {
+                    Text("分享")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { 
+                    showExportSuccess = false
+                    settingsViewModel.clearMessage()
+                }) {
+                    Text("关闭")
+                }
+            }
+        )
+    }
+    
+    // 登录/注册对话框
+    if (showLoginDialog) {
+        LoginDialog(
+            isRegisterMode = isRegisterMode,
+            isLoading = uiState.isLoggingIn,
+            error = uiState.loginError,
+            onDismiss = { 
+                showLoginDialog = false
+                settingsViewModel.clearMessage()
+            },
+            onLogin = { email, password ->
+                settingsViewModel.login(email, password)
+            },
+            onRegister = { email, password, nickname ->
+                settingsViewModel.register(email, password, nickname)
+            },
+            onToggleMode = { isRegisterMode = !isRegisterMode }
+        )
+    }
+}
+
+/**
+ * 登录对话框
+ */
+@Composable
+fun LoginDialog(
+    isRegisterMode: Boolean,
+    isLoading: Boolean,
+    error: String?,
+    onDismiss: () -> Unit,
+    onLogin: (String, String) -> Unit,
+    onRegister: (String, String, String) -> Unit,
+    onToggleMode: () -> Unit
+) {
+    var email by remember { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
+    var nickname by remember { mutableStateOf("") }
+    
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(if (isRegisterMode) "注册账号" else "登录") },
+        text = {
+            Column {
+                OutlinedTextField(
+                    value = email,
+                    onValueChange = { email = it },
+                    label = { Text("邮箱") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = password,
+                    onValueChange = { password = it },
+                    label = { Text("密码") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                if (isRegisterMode) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    OutlinedTextField(
+                        value = nickname,
+                        onValueChange = { nickname = it },
+                        label = { Text("昵称（可选）") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+                if (error != null) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(error, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    if (isRegisterMode) {
+                        onRegister(email, password, nickname)
+                    } else {
+                        onLogin(email, password)
+                    }
+                },
+                enabled = !isLoading && email.isNotBlank() && password.isNotBlank()
+            ) {
+                if (isLoading) {
+                    CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                } else {
+                    Text(if (isRegisterMode) "注册" else "登录")
+                }
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("取消")
+            }
+        }
+    )
 }

@@ -4,8 +4,6 @@ import android.app.Application
 import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-// import com.syncrime.inputmethod.core.CaptureStats
-// import com.syncrime.inputmethod.core.InputCaptureService
 import com.syncrime.inputmethod.repository.InputRepository
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -58,13 +56,15 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             _uiState.value = _uiState.value.copy(isLoading = true)
             
             // 获取今日统计
-            inputRepository.getTodayStats().collect { todayCount ->
+            inputRepository.getTodayCount().collect { todayCount ->
                 _uiState.value = _uiState.value.copy(
                     todayInputCount = todayCount,
                     isLoading = false
                 )
             }
-            
+        }
+        
+        viewModelScope.launch {
             // 获取总统计
             inputRepository.getTotalCount().collect { totalCount ->
                 _uiState.value = _uiState.value.copy(
