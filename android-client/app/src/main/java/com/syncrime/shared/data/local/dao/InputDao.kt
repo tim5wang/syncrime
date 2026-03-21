@@ -48,6 +48,12 @@ interface InputDao {
     fun getAll(limit: Int = 20, offset: Int = 0): Flow<List<InputRecord>>
     
     /**
+     * 获取最近记录（用于默认展示）
+     */
+    @Query("SELECT * FROM input_records ORDER BY createdAt DESC LIMIT 50")
+    fun getRecent(): Flow<List<InputRecord>>
+    
+    /**
      * 按应用查询
      */
     @Query("SELECT * FROM input_records WHERE application = :application ORDER BY createdAt DESC")

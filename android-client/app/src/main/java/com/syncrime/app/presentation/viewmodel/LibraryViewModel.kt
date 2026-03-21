@@ -1,122 +1,88 @@
 package com.syncrime.app.presentation.viewmodel
 
 import android.app.Application
-import androidx.lifecycle.ViewModel
-import androidx.lifecycle.ViewModelProvider
+import android.content.ClipboardManager
+import android.content.Context
+import android.util.Log
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.syncrime.shared.data.local.AppDatabase
 import com.syncrime.shared.model.KnowledgeClip
-import com.syncrime.inputmethod.repository.ClipRepository
+import com.syncrime.shared.model.SourceType
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 
-/**
- * 知识库 ViewModel
- */
-class LibraryViewModel(
-    private val clipRepository: ClipRepository
-) : ViewModel() {
+class LibraryViewModel(application: Application) : AndroidViewModel(application) {
+    
+    companion object { private const val TAG = "LibraryViewModel" }
     
     data class LibraryUiState(
-        val isLoading: Boolean = true,
+        val recentClipboard: List<ClipboardItem> = emptyList(),
         val clips: List<KnowledgeClip> = emptyList(),
-        val selectedCategory: String? = null,
-        val categories: List<String> = emptyList(),
-        val totalCount: Int = 0,
-        val todayCount: Int = 0
+        val message: String? = null
     )
     
-    // 状态流
+    data class ClipboardItem(val text: String, val time: Long = System.currentTimeMillis())
+    
     private val _uiState = MutableStateFlow(LibraryUiState())
     val uiState: StateFlow<LibraryUiState> = _uiState.asStateFlow()
     
+    private val clipboardManager = application.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+    private val database = AppDatabase.getDatabase(application)
+    
     init {
         loadClips()
-        loadStats()
+        loadClipboardHistory()
     }
     
-    /**
-     * 加载剪藏列表
-     */
-    fun loadClips(category: String? = null) {
+    private fun loadClips() {
         viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isLoading = true)
-            
-            val flow = if (category != null) {
-                clipRepository.getClipsByCategory(category)
-            } else {
-                clipRepository.getAllClips()
+            database.clipDao().getAll().catch { }.collect { clips ->
+                _uiState.value = _uiState.value.copy(clips = clips)
             }
-            
-            flow.collect { clips ->
-                _uiState.value = _uiState.value.copy(
-                    clips = clips,
-                    isLoading = false,
-                    selectedCategory = category
+        }
+    }
+    
+    fun loadClipboardHistory() {
+        val clipText = clipboardManager.primaryClip?.getItemAt(0)?.text?.toString()
+        if (!clipText.isNullOrBlank() && clipText.length >= 2) {
+            val currentList = _uiState.value.recentClipboard.toMutableList()
+            if (currentList.none { it.text == clipText }) {
+                currentList.add(0, ClipboardItem(clipText))
+                if (currentList.size > 10) currentList.removeLast()
+                _uiState.value = _uiState.value.copy(recentClipboard = currentList)
+            }
+        }
+    }
+    
+    fun addToClip(text: String, title: String? = null) {
+        viewModelScope.launch {
+            try {
+                val clip = KnowledgeClip(
+                    id = System.currentTimeMillis(),
+                    title = title ?: text.take(50),
+                    content = text,
+                    sourceType = SourceType.CLIP,
+                    createdAt = System.currentTimeMillis()
                 )
+                database.clipDao().insert(clip)
+                _uiState.value = _uiState.value.copy(message = "已添加到剪藏")
+            } catch (e: Exception) {
+                Log.e(TAG, "添加失败", e)
+                _uiState.value = _uiState.value.copy(message = "添加失败")
             }
         }
     }
     
-    /**
-     * 加载统计
-     */
-    private fun loadStats() {
+    fun deleteClip(clipId: Long) {
         viewModelScope.launch {
-            val stats = clipRepository.getStats()
-            _uiState.value = _uiState.value.copy(
-                totalCount = stats.total,
-                todayCount = stats.today
-            )
+            val clip = _uiState.value.clips.find { it.id == clipId }
+            if (clip != null) {
+                database.clipDao().delete(clip)
+                _uiState.value = _uiState.value.copy(message = "已删除")
+            }
         }
     }
     
-    /**
-     * 按分类筛选
-     */
-    fun filterByCategory(category: String?) {
-        loadClips(category)
-    }
-    
-    /**
-     * 刷新
-     */
-    fun refresh() {
-        loadClips(_uiState.value.selectedCategory)
-        loadStats()
-    }
-    
-    /**
-     * 删除剪藏
-     */
-    fun deleteClip(clip: KnowledgeClip) {
-        viewModelScope.launch {
-            clipRepository.deleteClip(clip)
-            loadClips(_uiState.value.selectedCategory)
-        }
-    }
-    
-    /**
-     * 切换收藏
-     */
-    fun toggleFavorite(clip: KnowledgeClip) {
-        viewModelScope.launch {
-            clipRepository.incrementFavoriteCount(clip.id)
-        }
-    }
-}
-
-/**
- * ViewModel Factory
- */
-class LibraryViewModelFactory(
-    private val clipRepository: ClipRepository
-) : ViewModelProvider.Factory {
-    
-    @Suppress("UNCHECKED_CAST")
-    override fun <T : ViewModel> create(modelClass: Class<T>): T {
-        if (modelClass.isAssignableFrom(LibraryViewModel::class.java)) {
-            return LibraryViewModel(clipRepository) as T
-        }
-        throw IllegalArgumentException("Unknown ViewModel class")
-    }
+    fun clearMessage() { _uiState.value = _uiState.value.copy(message = null) }
 }

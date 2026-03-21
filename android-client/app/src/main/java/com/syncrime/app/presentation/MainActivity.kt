@@ -1,9 +1,7 @@
 package com.syncrime.app.presentation
 
-import android.content.Context
 import android.content.Intent
 import android.os.Bundle
-import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
@@ -20,11 +18,11 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.syncrime.android.debug.DebugViewModel
 import com.syncrime.app.presentation.viewmodel.HomeViewModel
+import com.syncrime.app.presentation.viewmodel.LibraryViewModel
 import com.syncrime.app.presentation.viewmodel.SearchViewModel
 import com.syncrime.app.presentation.viewmodel.SettingsViewModel
-import com.syncrime.shared.model.InputRecord
+import com.syncrime.android.debug.DebugViewModel
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -72,8 +70,6 @@ fun MainScreen(homeViewModel: HomeViewModel) {
 fun HomeTab(viewModel: HomeViewModel) {
     val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
-    
-    // 每次显示时检查无障碍状态
     LaunchedEffect(Unit) { viewModel.checkAccessibilityStatus() }
     
     Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
@@ -83,8 +79,8 @@ fun HomeTab(viewModel: HomeViewModel) {
             Column(modifier = Modifier.padding(16.dp)) {
                 Text("📊 今日统计", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                 Spacer(modifier = Modifier.height(8.dp))
-                if (uiState.isLoading) CircularProgressIndicator(modifier = Modifier.size(24.dp))
-                else { Text("输入记录：${uiState.todayInputCount} 条"); Text("总记录：${uiState.totalInputCount} 条") }
+                Text("输入记录：${uiState.todayInputCount} 条")
+                Text("总记录：${uiState.totalInputCount} 条")
             }
         }
         Spacer(modifier = Modifier.height(12.dp))
@@ -107,21 +103,138 @@ fun HomeTab(viewModel: HomeViewModel) {
 @Composable
 fun SearchTab(viewModel: SearchViewModel = viewModel()) {
     val uiState by viewModel.uiState.collectAsState()
+    val displayRecords = if (uiState.hasSearched) uiState.results else uiState.recentRecords
+    
     Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
-        Text("🔍 搜索", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+        Text(if (uiState.hasSearched) "🔍 搜索结果" else "📝 最近输入", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
         Spacer(modifier = Modifier.height(16.dp))
-        OutlinedTextField(uiState.query, { viewModel.setQuery(it) }, Modifier.fillMaxWidth(), placeholder = { Text("搜索输入记录...") }, leadingIcon = { Icon(Icons.Default.Search, null) }, singleLine = true)
+        
+        OutlinedTextField(
+            value = uiState.query,
+            onValueChange = { viewModel.setQuery(it) },
+            modifier = Modifier.fillMaxWidth(),
+            placeholder = { Text("搜索输入记录...") },
+            leadingIcon = { Icon(Icons.Default.Search, null) },
+            trailingIcon = {
+                if (uiState.query.isNotEmpty()) {
+                    IconButton({ viewModel.clearSearch() }) { Icon(Icons.Default.Clear, null) }
+                }
+            },
+            singleLine = true
+        )
+        
         Spacer(modifier = Modifier.height(16.dp))
-        Card(Modifier.fillMaxWidth()) { Column(Modifier.padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) { Icon(Icons.Default.Search, null, Modifier.size(48.dp)); Spacer(Modifier.height(8.dp)); Text("输入关键词搜索") } }
+        
+        when {
+            uiState.isSearching -> Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+            displayRecords.isEmpty() -> {
+                Card(Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(32.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                        Icon(Icons.Default.Edit, null, Modifier.size(48.dp))
+                        Spacer(Modifier.height(8.dp))
+                        Text(if (uiState.hasSearched) "未找到匹配记录" else "暂无输入记录")
+                        if (!uiState.hasSearched) {
+                            Spacer(Modifier.height(8.dp))
+                            Text("开启无障碍服务后，输入内容将显示在这里", style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
+                }
+            }
+            else -> {
+                Text("${if (uiState.hasSearched) "找到" else "共"} ${displayRecords.size} 条记录", style = MaterialTheme.typography.bodyMedium)
+                Spacer(Modifier.height(8.dp))
+                LazyColumn {
+                    items(displayRecords) { record ->
+                        Card(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+                            Column(Modifier.padding(12.dp)) {
+                                Text(record.content.take(100) + if (record.content.length > 100) "..." else "")
+                                Spacer(Modifier.height(4.dp))
+                                Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween) {
+                                    Text(record.application, style = MaterialTheme.typography.bodySmall)
+                                    Text(formatTime(record.createdAt), style = MaterialTheme.typography.bodySmall)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 
 @Composable
-fun LibraryTab() {
+fun LibraryTab(viewModel: LibraryViewModel = viewModel()) {
+    val uiState by viewModel.uiState.collectAsState()
+    val context = LocalContext.current
+    
+    // 刷新剪贴板
+    LaunchedEffect(Unit) { viewModel.loadClipboardHistory() }
+    
     Column(Modifier.fillMaxSize().padding(16.dp)) {
         Text("📚 知识库", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
         Spacer(Modifier.height(16.dp))
-        Card(Modifier.fillMaxWidth()) { Column(Modifier.padding(32.dp), horizontalAlignment = Alignment.CenterHorizontally) { Icon(Icons.Default.FolderOpen, null, Modifier.size(64.dp)); Spacer(Modifier.height(16.dp)); Text("暂无剪藏内容") } }
+        
+        // 剪贴板内容
+        Card(Modifier.fillMaxWidth()) {
+            Column(Modifier.padding(16.dp)) {
+                Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween, Alignment.CenterVertically) {
+                    Text("📋 剪贴板", fontWeight = FontWeight.Bold)
+                    IconButton({ viewModel.loadClipboardHistory() }) { Icon(Icons.Default.Refresh, null) }
+                }
+                Spacer(Modifier.height(8.dp))
+                if (uiState.recentClipboard.isEmpty()) {
+                    Text("复制内容后将显示在这里", style = MaterialTheme.typography.bodySmall)
+                } else {
+                    LazyColumn(Modifier.height(150.dp)) {
+                        items(uiState.recentClipboard) { item ->
+                            Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), Arrangement.SpaceBetween, Alignment.CenterVertically) {
+                                Text(item.text.take(30) + if (item.text.length > 30) "..." else "", Modifier.weight(1f))
+                                IconButton({ viewModel.addToClip(item.text) }) { Icon(Icons.Default.Add, "添加到剪藏", Modifier.size(20.dp)) }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        Spacer(Modifier.height(16.dp))
+        
+        // 已剪藏内容
+        Text("📌 我的剪藏", fontWeight = FontWeight.Bold)
+        Spacer(Modifier.height(8.dp))
+        
+        if (uiState.clips.isEmpty()) {
+            Card(Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(32.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                    Icon(Icons.Default.BookmarkBorder, null, Modifier.size(48.dp))
+                    Spacer(Modifier.height(8.dp))
+                    Text("暂无剪藏内容")
+                    Text("从上方剪贴板添加", style = MaterialTheme.typography.bodySmall)
+                }
+            }
+        } else {
+            LazyColumn {
+                items(uiState.clips) { clip ->
+                    Card(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+                        Column(Modifier.padding(12.dp)) {
+                            Text(clip.title, fontWeight = FontWeight.Bold)
+                            Spacer(Modifier.height(4.dp))
+                            Text(clip.content.take(100) + if (clip.content.length > 100) "..." else "", style = MaterialTheme.typography.bodyMedium)
+                            Spacer(Modifier.height(4.dp))
+                            Text(formatTime(clip.createdAt), style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
+                }
+            }
+        }
+        
+        uiState.message?.let {
+            Spacer(Modifier.height(8.dp))
+            Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)) {
+                Text(it, Modifier.padding(12.dp))
+            }
+            LaunchedEffect(it) { kotlinx.coroutines.delay(2000); viewModel.clearMessage() }
+        }
     }
 }
 
@@ -135,6 +248,7 @@ fun SettingsTab(viewModel: SettingsViewModel = viewModel()) {
     Column(Modifier.fillMaxSize().padding(16.dp)) {
         Text("设置", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
         Spacer(Modifier.height(16.dp))
+        
         Card(Modifier.fillMaxWidth()) {
             Column(Modifier.padding(16.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -149,15 +263,22 @@ fun SettingsTab(viewModel: SettingsViewModel = viewModel()) {
                 }
             }
         }
+        
         Spacer(Modifier.height(12.dp))
         Card(Modifier.fillMaxWidth()) {
             Column(Modifier.padding(16.dp)) {
                 Text("⚙️ 无障碍服务", fontWeight = FontWeight.Bold)
-                Spacer(Modifier.height(8.dp)); Text("需要开启无障碍服务才能采集输入内容")
+                Spacer(Modifier.height(8.dp))
+                Text("需要开启无障碍服务才能采集输入内容")
                 Spacer(Modifier.height(12.dp))
-                Button({ context.startActivity(Intent(android.provider.Settings.ACTION_ACCESSIBILITY_SETTINGS)) }, Modifier.fillMaxWidth()) { Icon(Icons.Default.SettingsAccessibility, null, Modifier.size(18.dp)); Spacer(Modifier.width(8.dp)); Text("打开无障碍设置") }
+                Button({ context.startActivity(Intent(android.provider.Settings.ACTION_ACCESSIBILITY_SETTINGS)) }, Modifier.fillMaxWidth()) {
+                    Icon(Icons.Default.SettingsAccessibility, null, Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("打开无障碍设置")
+                }
             }
         }
+        
         Spacer(Modifier.height(12.dp))
         Card(Modifier.fillMaxWidth()) {
             Column(Modifier.padding(16.dp)) {
@@ -168,8 +289,10 @@ fun SettingsTab(viewModel: SettingsViewModel = viewModel()) {
                 Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween) { Text("隐私过滤"); Switch(uiState.privacyFilter, { viewModel.setPrivacyFilter(it) }) }
             }
         }
+        
         uiState.message?.let { Spacer(Modifier.height(8.dp)); Text(it, color = MaterialTheme.colorScheme.primary) }
     }
+    
     if (showLoginDialog) {
         var email by remember { mutableStateOf("") }
         var password by remember { mutableStateOf("") }
@@ -226,3 +349,5 @@ fun DebugTab(viewModel: DebugViewModel = viewModel()) {
         }
     }
 }
+
+fun formatTime(timestamp: Long): String = SimpleDateFormat("MM-dd HH:mm", Locale.getDefault()).format(Date(timestamp))

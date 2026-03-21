@@ -17,6 +17,7 @@ class SearchViewModel(application: Application) : AndroidViewModel(application) 
         val query: String = "",
         val isSearching: Boolean = false,
         val results: List<InputRecord> = emptyList(),
+        val recentRecords: List<InputRecord> = emptyList(),
         val hasSearched: Boolean = false,
         val error: String? = null
     )
@@ -26,11 +27,28 @@ class SearchViewModel(application: Application) : AndroidViewModel(application) 
     
     private val repository: DataRepository = DataRepository.getInstance(application)
     
+    init {
+        // 加载最近记录作为默认展示
+        loadRecentRecords()
+    }
+    
+    private fun loadRecentRecords() {
+        viewModelScope.launch {
+            repository.getRecentRecords()
+                .catch { e -> Log.e(TAG, "加载最近记录失败", e) }
+                .collect { records ->
+                    Log.d(TAG, "加载最近记录: ${records.size} 条")
+                    _uiState.value = _uiState.value.copy(recentRecords = records)
+                }
+        }
+    }
+    
     fun setQuery(query: String) {
         _uiState.value = _uiState.value.copy(query = query)
         if (query.isNotBlank()) {
             search(query)
         } else {
+            // 清空搜索，恢复显示最近记录
             _uiState.value = _uiState.value.copy(results = emptyList(), hasSearched = false)
         }
     }
@@ -42,27 +60,26 @@ class SearchViewModel(application: Application) : AndroidViewModel(application) 
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isSearching = true, hasSearched = true, error = null)
             
-            try {
-                repository.searchRecords(query)
-                    .catch { e ->
-                        Log.e(TAG, "搜索失败", e)
-                        _uiState.value = _uiState.value.copy(error = e.message, isSearching = false)
-                    }
-                    .collect { results ->
-                        Log.d(TAG, "搜索结果: ${results.size} 条")
-                        _uiState.value = _uiState.value.copy(
-                            results = results,
-                            isSearching = false
-                        )
-                    }
-            } catch (e: Exception) {
-                Log.e(TAG, "搜索异常", e)
-                _uiState.value = _uiState.value.copy(error = e.message, isSearching = false)
-            }
+            repository.searchRecords(query)
+                .catch { e ->
+                    Log.e(TAG, "搜索失败", e)
+                    _uiState.value = _uiState.value.copy(error = e.message, isSearching = false)
+                }
+                .collect { results ->
+                    Log.d(TAG, "搜索结果: ${results.size} 条")
+                    _uiState.value = _uiState.value.copy(
+                        results = results,
+                        isSearching = false
+                    )
+                }
         }
     }
     
     fun clearSearch() { 
-        _uiState.value = SearchUiState() 
+        _uiState.value = _uiState.value.copy(
+            query = "", 
+            results = emptyList(), 
+            hasSearched = false
+        )
     }
 }
