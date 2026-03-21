@@ -71,6 +71,11 @@ fun MainScreen(homeViewModel: HomeViewModel) {
 @Composable
 fun HomeTab(viewModel: HomeViewModel) {
     val uiState by viewModel.uiState.collectAsState()
+    val context = LocalContext.current
+    
+    // 每次显示时检查无障碍状态
+    LaunchedEffect(Unit) { viewModel.checkAccessibilityStatus() }
+    
     Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
         Text("欢迎使用 SyncRime", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
         Spacer(modifier = Modifier.height(16.dp))
@@ -87,7 +92,13 @@ fun HomeTab(viewModel: HomeViewModel) {
             Column(modifier = Modifier.padding(16.dp)) {
                 Text("ℹ️ 服务状态", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                 Spacer(modifier = Modifier.height(8.dp))
-                Text("无障碍服务：未开启", color = MaterialTheme.colorScheme.error)
+                if (uiState.isAccessibilityEnabled) {
+                    Text("无障碍服务：✅ 已开启", color = MaterialTheme.colorScheme.primary)
+                } else {
+                    Text("无障碍服务：❌ 未开启", color = MaterialTheme.colorScheme.error)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Button({ context.startActivity(Intent(android.provider.Settings.ACTION_ACCESSIBILITY_SETTINGS)) }) { Text("去开启") }
+                }
             }
         }
     }

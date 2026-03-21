@@ -15,6 +15,26 @@ object ApiClient {
     fun setAuthToken(token: String?) { authToken = token }
     fun getAuthToken(): String? = authToken
     
+    suspend fun healthCheck(): ApiResponse = withContext(Dispatchers.IO) {
+        try {
+            val url = URL("https://syncrime-api.claw.carc.top/health")
+            val conn = url.openConnection() as HttpURLConnection
+            conn.requestMethod = "GET"
+            conn.connectTimeout = 10000
+            conn.readTimeout = 10000
+            val code = conn.responseCode
+            val response = if (code in 200..299) {
+                conn.inputStream.bufferedReader().use { it.readText() }
+            } else {
+                conn.errorStream?.bufferedReader()?.use { it.readText() } ?: ""
+            }
+            ApiResponse(code, response)
+        } catch (e: Exception) {
+            Log.e(TAG, "Health check failed", e)
+            ApiResponse(-1, "{\"error\":\"${e.message}\"}")
+        }
+    }
+    
     suspend fun get(endpoint: String): ApiResponse = withContext(Dispatchers.IO) {
         request("GET", endpoint, null)
     }

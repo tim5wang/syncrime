@@ -44,7 +44,7 @@ class DebugViewModel : ViewModel() {
         viewModelScope.launch {
             addLog("API", "测试 API 连接...")
             try {
-                val response = ApiClient.get("/../health")
+                val response = ApiClient.healthCheck()
                 if (response.isSuccess) {
                     _state.value = _state.value.copy(apiStatus = "✅ 正常")
                     addLog("API", "连接成功: ${response.body}")
