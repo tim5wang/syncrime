@@ -54,6 +54,18 @@ interface InputDao {
     fun getRecent(): Flow<List<InputRecord>>
     
     /**
+     * 获取最近记录（同步版本，用于清理）
+     */
+    @Query("SELECT * FROM input_records ORDER BY createdAt DESC LIMIT :limit")
+    suspend fun getRecentSync(limit: Int = 10): List<InputRecord>
+    
+    /**
+     * 删除记录
+     */
+    @Delete
+    suspend fun delete(record: InputRecord)
+    
+    /**
      * 按应用查询
      */
     @Query("SELECT * FROM input_records WHERE application = :application ORDER BY createdAt DESC")

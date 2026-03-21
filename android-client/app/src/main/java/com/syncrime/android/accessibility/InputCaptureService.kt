@@ -7,23 +7,22 @@ import android.view.accessibility.AccessibilityEvent
 import com.syncrime.shared.data.local.AppDatabase
 import com.syncrime.shared.model.InputRecord
 import kotlinx.coroutines.*
-import java.util.*
 
 class InputCaptureService : AccessibilityService() {
     
     companion object {
         private const val TAG = "InputCaptureService"
-        private const val SAVE_DELAY = 2000L // 2秒无输入后保存
+        private const val SAVE_DELAY = 3000L // 3秒无输入后保存
+        private const val MIN_LENGTH = 2 // 最小保存长度
         private var instance: InputCaptureService? = null
         fun isRunning(): Boolean = instance != null
     }
     
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var inputCount: Int = 0
-    
-    // 输入缓冲
-    private var currentText: StringBuilder = StringBuilder()
+    private var currentText: String = ""
     private var currentPackage: String = ""
+    private var lastSavedText: String = ""
     private var saveJob: Job? = null
     
     override fun onServiceConnected() {
@@ -32,12 +31,9 @@ class InputCaptureService : AccessibilityService() {
         Log.i(TAG, "=== 无障碍服务已连接 ===")
         
         val serviceInfo = AccessibilityServiceInfo().apply {
-            eventTypes = AccessibilityEvent.TYPE_VIEW_TEXT_CHANGED or
-                        AccessibilityEvent.TYPE_VIEW_FOCUSED or
-                        AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED
+            eventTypes = AccessibilityEvent.TYPE_VIEW_TEXT_CHANGED or AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED
             feedbackType = AccessibilityServiceInfo.FEEDBACK_GENERIC
-            flags = AccessibilityServiceInfo.FLAG_INCLUDE_NOT_IMPORTANT_VIEWS or
-                   AccessibilityServiceInfo.FLAG_REPORT_VIEW_IDS
+            flags = AccessibilityServiceInfo.FLAG_INCLUDE_NOT_IMPORTANT_VIEWS
             notificationTimeout = 100
         }
         setServiceInfo(serviceInfo)
@@ -48,51 +44,28 @@ class InputCaptureService : AccessibilityService() {
         
         when (event.eventType) {
             AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED -> {
-                // 窗口切换时，保存当前输入并重置
                 saveCurrentInput()
                 currentPackage = event.packageName?.toString() ?: "unknown"
-                Log.d(TAG, "窗口切换: $currentPackage")
             }
             AccessibilityEvent.TYPE_VIEW_TEXT_CHANGED -> {
                 val text = event.text?.joinToString("") ?: ""
-                if (text.isBlank()) return
-                
-                // 过滤敏感内容
-                if (shouldFilter(text)) return
-                
-                // 更新当前文本
-                currentText.clear()
-                currentText.append(text)
-                
-                // 延迟保存（等待用户输入完成）
+                if (text.isBlank() || shouldFilter(text)) return
+                currentText = text
                 scheduleSave()
-            }
-            AccessibilityEvent.TYPE_VIEW_FOCUSED -> {
-                // 输入框失去焦点时保存
-                if (event.contentChangeTypes and AccessibilityEvent.CONTENT_CHANGE_TYPE_PANE_DISAPPEARED != 0) {
-                    saveCurrentInput()
-                }
             }
         }
     }
     
-    override fun onInterrupt() {
-        Log.w(TAG, "无障碍服务被中断")
-    }
+    override fun onInterrupt() {}
     
     override fun onDestroy() {
-        super.onDestroy()
-        saveCurrentInput() // 保存最后的输入
+        saveCurrentInput()
         instance = null
         serviceScope.cancel()
-        Log.i(TAG, "无障碍服务已销毁")
     }
     
     private fun scheduleSave() {
-        // 取消之前的保存任务
         saveJob?.cancel()
-        
-        // 延迟保存
         saveJob = serviceScope.launch {
             delay(SAVE_DELAY)
             saveCurrentInput()
@@ -100,21 +73,26 @@ class InputCaptureService : AccessibilityService() {
     }
     
     private fun saveCurrentInput() {
-        val text = currentText.toString()
-        if (text.isBlank()) return
+        val text = currentText
+        currentText = ""
         
-        // 清空缓冲
-        currentText.clear()
+        if (text.isBlank() || text.length < MIN_LENGTH) return
         
-        // 过滤太短的内容
-        if (text.length < 2) return
+        // 前缀去重：新输入包含上次保存的内容，更新而不是新增
+        val isUpdate = lastSavedText.isNotEmpty() && text.startsWith(lastSavedText) && text.length > lastSavedText.length
         
         serviceScope.launch {
             try {
                 val database = AppDatabase.getDatabase(this@InputCaptureService)
+                
+                if (isUpdate) {
+                    // 删除旧记录
+                    cleanupShortRecords(database, text)
+                }
+                
                 val record = InputRecord(
                     id = System.currentTimeMillis(),
-                    sessionId = System.currentTimeMillis() / 1000, // 按秒分组会话
+                    sessionId = System.currentTimeMillis() / 10000,
                     content = text,
                     application = getAppName(currentPackage),
                     category = null,
@@ -122,27 +100,37 @@ class InputCaptureService : AccessibilityService() {
                     isSensitive = false
                 )
                 database.inputDao().insert(record)
+                lastSavedText = text
                 inputCount++
-                Log.i(TAG, "✅ 已保存输入 #$inputCount: \"${text.take(30)}...\" (${text.length}字, 来源: ${getAppName(currentPackage)})")
+                Log.i(TAG, "✅ 保存输入 #$inputCount (${if (isUpdate) "更新" else "新增"}): \"${text.take(30)}...\"")
             } catch (e: Exception) {
-                Log.e(TAG, "保存输入失败", e)
+                Log.e(TAG, "保存失败", e)
             }
         }
     }
     
+    private suspend fun cleanupShortRecords(database: AppDatabase, newText: String) {
+        try {
+            val recentRecords = database.inputDao().getRecentSync(5)
+            for (record in recentRecords) {
+                if (newText.contains(record.content) && newText.length > record.content.length + 2) {
+                    database.inputDao().delete(record)
+                    Log.d(TAG, "删除短记录: ${record.content.take(20)}")
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "清理失败", e)
+        }
+    }
+    
     private fun shouldFilter(text: String): Boolean {
-        val lowerText = text.lowercase()
-        val sensitiveKeywords = listOf("password", "密码", "验证码", "code", "pin", "cvv", "身份证", "卡号")
-        return sensitiveKeywords.any { lowerText.contains(it) }
+        val sensitiveKeywords = listOf("password", "密码", "验证码", "code", "pin", "cvv", "身份证")
+        return sensitiveKeywords.any { text.lowercase().contains(it) }
     }
     
     private fun getAppName(packageName: String): String {
         return try {
-            val pm = packageManager
-            val appInfo = pm.getApplicationInfo(packageName, 0)
-            pm.getApplicationLabel(appInfo).toString()
-        } catch (e: Exception) {
-            packageName
-        }
+            packageManager.getApplicationLabel(packageManager.getApplicationInfo(packageName, 0)).toString()
+        } catch (e: Exception) { packageName }
     }
 }
