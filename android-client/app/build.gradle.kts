@@ -1,3 +1,8 @@
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+import java.io.File
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -5,16 +10,58 @@ plugins {
     id("kotlin-parcelize")
 }
 
+// 读取并递增 versionCode (基于日期 + 当日构建次数)
+fun generateVersionCode(projectDir: File): Int {
+    val date = Date()
+    val dateFormat = SimpleDateFormat("yyMMdd", Locale.getDefault())
+    val datePrefix = dateFormat.format(date).toInt()
+    
+    // 读取构建次数文件
+    val buildCountFile = File(projectDir, "build_count.txt")
+    val lastBuildDateFile = File(projectDir, "last_build_date.txt")
+    
+    var buildCount = 0
+    var lastDate = ""
+    
+    if (lastBuildDateFile.exists()) {
+        lastDate = lastBuildDateFile.readText().trim()
+    }
+    
+    val today = SimpleDateFormat("yyMMdd", Locale.getDefault()).format(Date())
+    
+    if (lastDate == today && buildCountFile.exists()) {
+        buildCount = buildCountFile.readText().trim().toIntOrNull() ?: 0
+        buildCount++
+    } else {
+        buildCount = 1
+    }
+    
+    // 保存新的构建次数和日期
+    buildCountFile.writeText("$buildCount")
+    lastBuildDateFile.writeText(today)
+    
+    // versionCode = yyMMdd + 2 位构建次数 (01-99)
+    return datePrefix * 100 + buildCount
+}
+
+// 自动生成版本名称：1.x.x-YYYYMMDD-HHMM
+fun generateVersionName(): String {
+    val date = Date()
+    val dateFormat = SimpleDateFormat("yyyyMMdd", Locale.getDefault())
+    val timeFormat = SimpleDateFormat("HHmm", Locale.getDefault())
+    return "1.${dateFormat.format(date)}.${timeFormat.format(date)}"
+}
+
 android {
     namespace = "com.syncrime.android"
-    compileSdk = 34
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.syncrime.android"
         minSdk = 24
-        targetSdk = 34
-        versionCode = 1
-        versionName = "1.0.0"
+        targetSdk = 36
+        versionCode = generateVersionCode(projectDir)
+        versionName = generateVersionName()
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         
@@ -22,16 +69,16 @@ android {
             useSupportLibrary = true
         }
         
-        buildConfigField("String", "API_BASE_URL", "\"https://api.syncrime.com\"")
-        buildConfigField("String", "SYNC_SERVER_URL", "\"https://sync.syncrime.com\"")
-        buildConfigField("long", "SYNC_INTERVAL", "900000") // 15分钟
+        buildConfigField("String", "API_BASE_URL", "\"https://syncrime-api.claw.carc.top\"")
+        buildConfigField("String", "SYNC_SERVER_URL", "\"https://syncrime-api.claw.carc.top\"")
+        buildConfigField("long", "SYNC_INTERVAL", "900000") // 15 分钟
     }
 
     buildTypes {
         debug {
             applicationIdSuffix = ".debug"
-            buildConfigField("String", "API_BASE_URL", "\"https://api-dev.syncrime.com\"")
-            buildConfigField("String", "SYNC_SERVER_URL", "\"https://sync-dev.syncrime.com\"")
+            buildConfigField("String", "API_BASE_URL", "\"https://syncrime-api.claw.carc.top\"")
+            buildConfigField("String", "SYNC_SERVER_URL", "\"https://syncrime-api.claw.carc.top\"")
         }
         
         release {
@@ -41,6 +88,18 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+        }
+    }
+    
+    // 自定义 APK 输出文件名
+    applicationVariants.all {
+        val variant = this
+        variant.outputs.all {
+            val output = this as com.android.build.gradle.internal.api.BaseVariantOutputImpl
+            val appName = "SyncRime"
+            val version = variant.versionName
+            val buildType = variant.buildType.name
+            output.outputFileName = "${appName}-v${version}-${buildType}.apk"
         }
     }
 
@@ -144,4 +203,29 @@ dependencies {
 // Kotlin Compose Compiler
 kotlin {
     jvmToolchain(17)
+}
+
+// 编译前清理旧的 APK 文件任务
+tasks.register("cleanOldApks") {
+    doLast {
+        val debugApkDir = File("$buildDir/outputs/apk/debug")
+        val releaseApkDir = File("$buildDir/outputs/apk/release")
+        
+        if (debugApkDir.exists()) {
+            debugApkDir.listFiles { file -> file.extension == "apk" }?.forEach { 
+                it.delete()
+                println("🧹 已删除：${it.name}")
+            }
+        }
+        if (releaseApkDir.exists()) {
+            releaseApkDir.listFiles { file -> file.extension == "apk" }?.forEach { 
+                it.delete()
+                println("🧹 已删除：${it.name}")
+            }
+        }
+    }
+}
+
+tasks.named("preBuild") {
+    dependsOn("cleanOldApks")
 }
