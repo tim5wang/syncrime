@@ -18,6 +18,7 @@
     </string>
     
     <string name="accessibility_service_title">SyncRime 输入采集</string>
+    <string name="accessibility_service_summary">采集输入内容，提供智能推荐和同步功能</string>
     
     <!-- Notifications -->
     <string name="notification_channel_capture_service">输入采集服务</string>

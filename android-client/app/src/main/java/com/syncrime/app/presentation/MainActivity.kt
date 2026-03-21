@@ -8,6 +8,8 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -19,7 +21,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.syncrime.app.presentation.viewmodel.HomeViewModel
+import com.syncrime.app.presentation.viewmodel.SearchViewModel
 import com.syncrime.app.presentation.viewmodel.SettingsViewModel
+import com.syncrime.shared.model.InputRecord
+import java.text.SimpleDateFormat
+import java.util.*
 
 class MainActivity : ComponentActivity() {
     
@@ -115,6 +121,10 @@ fun HomeTab(viewModel: HomeViewModel) {
                     Text("输入记录：${uiState.todayInputCount} 条")
                     Text("总记录：${uiState.totalInputCount} 条")
                 }
+                uiState.error?.let {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text("错误: $it", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                }
             }
         }
         
@@ -131,35 +141,108 @@ fun HomeTab(viewModel: HomeViewModel) {
 }
 
 @Composable
-fun SearchTab() {
-    var searchText by remember { mutableStateOf("") }
+fun SearchTab(viewModel: SearchViewModel = viewModel()) {
+    val uiState by viewModel.uiState.collectAsState()
     
     Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
         Text("🔍 搜索", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
         Spacer(modifier = Modifier.height(16.dp))
         
         OutlinedTextField(
-            value = searchText,
-            onValueChange = { searchText = it },
+            value = uiState.query,
+            onValueChange = { viewModel.setQuery(it) },
             modifier = Modifier.fillMaxWidth(),
             placeholder = { Text("搜索输入记录...") },
             leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+            trailingIcon = {
+                if (uiState.query.isNotEmpty()) {
+                    IconButton(onClick = { viewModel.clearSearch() }) {
+                        Icon(Icons.Default.Clear, contentDescription = "清除")
+                    }
+                }
+            },
             singleLine = true
         )
         
         Spacer(modifier = Modifier.height(16.dp))
         
-        Card(modifier = Modifier.fillMaxWidth()) {
-            Column(
-                modifier = Modifier.padding(16.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(48.dp))
+        when {
+            uiState.isSearching -> {
+                Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator()
+                }
+            }
+            uiState.hasSearched && uiState.results.isEmpty() -> {
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Column(
+                        modifier = Modifier.padding(32.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Icon(Icons.Default.SearchOff, contentDescription = null, modifier = Modifier.size(48.dp))
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text("未找到匹配的记录")
+                    }
+                }
+            }
+            uiState.hasSearched -> {
+                Text("找到 ${uiState.results.size} 条记录", style = MaterialTheme.typography.bodyMedium)
                 Spacer(modifier = Modifier.height(8.dp))
-                Text("输入关键词搜索", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                LazyColumn {
+                    items(uiState.results) { record ->
+                        InputRecordItem(record)
+                    }
+                }
+            }
+            else -> {
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(48.dp))
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text("输入关键词搜索", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
             }
         }
     }
+}
+
+@Composable
+fun InputRecordItem(record: InputRecord) {
+    Card(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+    ) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            Text(
+                text = record.content.take(100) + if (record.content.length > 100) "..." else "",
+                style = MaterialTheme.typography.bodyMedium
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = record.application,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    text = formatTime(record.createdAt),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    }
+}
+
+fun formatTime(timestamp: Long): String {
+    val sdf = SimpleDateFormat("MM-dd HH:mm", Locale.getDefault())
+    return sdf.format(Date(timestamp))
 }
 
 @Composable
@@ -193,7 +276,6 @@ fun SettingsTab(viewModel: SettingsViewModel = viewModel()) {
         Text("设置", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
         Spacer(modifier = Modifier.height(16.dp))
         
-        // 用户账户
         Card(modifier = Modifier.fillMaxWidth()) {
             Column(modifier = Modifier.padding(16.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -201,28 +283,19 @@ fun SettingsTab(viewModel: SettingsViewModel = viewModel()) {
                     Spacer(modifier = Modifier.width(12.dp))
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            if (uiState.isLoggedIn) "👤 ${uiState.userNickname ?: "用户"}" else "未登录",
+                            if (uiState.isLoggedIn) "👤 ${uiState.userNickname}" else "未登录",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold
                         )
-                        if (uiState.isLoggedIn) {
-                            Text(uiState.userEmail ?: "", style = MaterialTheme.typography.bodySmall)
-                        } else {
-                            Text("点击登录以同步数据", style = MaterialTheme.typography.bodySmall)
-                        }
+                        Text("点击登录以同步数据", style = MaterialTheme.typography.bodySmall)
                     }
-                    if (uiState.isLoggedIn) {
-                        TextButton(onClick = { }) { Text("退出") }
-                    } else {
-                        Button(onClick = { }) { Text("登录") }
-                    }
+                    Button(onClick = { }) { Text("登录") }
                 }
             }
         }
         
         Spacer(modifier = Modifier.height(12.dp))
         
-        // 无障碍服务
         Card(modifier = Modifier.fillMaxWidth()) {
             Column(modifier = Modifier.padding(16.dp)) {
                 Text("⚙️ 无障碍服务", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
@@ -248,7 +321,6 @@ fun SettingsTab(viewModel: SettingsViewModel = viewModel()) {
         
         Spacer(modifier = Modifier.height(12.dp))
         
-        // 数据设置
         Card(modifier = Modifier.fillMaxWidth()) {
             Column(modifier = Modifier.padding(16.dp)) {
                 Text("💾 数据设置", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
@@ -259,14 +331,8 @@ fun SettingsTab(viewModel: SettingsViewModel = viewModel()) {
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Column {
-                        Text("自动保存输入记录")
-                        Text("开启后自动保存", style = MaterialTheme.typography.bodySmall)
-                    }
-                    Switch(
-                        checked = uiState.autoSave,
-                        onCheckedChange = { viewModel.setAutoSave(it) }
-                    )
+                    Column { Text("自动保存输入记录"); Text("开启后自动保存", style = MaterialTheme.typography.bodySmall) }
+                    Switch(checked = uiState.autoSave, onCheckedChange = { viewModel.setAutoSave(it) })
                 }
                 
                 Spacer(modifier = Modifier.height(12.dp))
@@ -276,45 +342,19 @@ fun SettingsTab(viewModel: SettingsViewModel = viewModel()) {
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Column {
-                        Text("隐私内容过滤")
-                        Text("过滤敏感信息", style = MaterialTheme.typography.bodySmall)
-                    }
-                    Switch(
-                        checked = uiState.privacyFilter,
-                        onCheckedChange = { viewModel.setPrivacyFilter(it) }
-                    )
-                }
-                
-                Spacer(modifier = Modifier.height(12.dp))
-                
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text("保留天数: ${uiState.cleanupDays} 天")
-                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                        listOf(7, 14, 30, 60).forEach { days ->
-                            FilterChip(
-                                selected = uiState.cleanupDays == days,
-                                onClick = { viewModel.setCleanupDays(days) },
-                                label = { Text("$days") }
-                            )
-                        }
-                    }
+                    Column { Text("隐私内容过滤"); Text("过滤敏感信息", style = MaterialTheme.typography.bodySmall) }
+                    Switch(checked = uiState.privacyFilter, onCheckedChange = { viewModel.setPrivacyFilter(it) })
                 }
             }
         }
         
         Spacer(modifier = Modifier.height(12.dp))
         
-        // 关于
         Card(modifier = Modifier.fillMaxWidth()) {
             Column(modifier = Modifier.padding(16.dp)) {
                 Text("关于", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                 Spacer(modifier = Modifier.height(8.dp))
-                Text("版本：1.0.0 (阶段2)")
+                Text("版本：1.0.0 (阶段3)")
                 Text("© 2026 SyncRime")
             }
         }
