@@ -39,9 +39,9 @@ abstract class SyncRimeDatabase : RoomDatabase() {
                 val instance = Room.databaseBuilder(
                     context.applicationContext,
                     SyncRimeDatabase::class.java,
-                    "syncrime_database"
+                    "syncrime_main_db"  // 使用不同的数据库名避免冲突
                 )
-                .fallbackToDestructiveMigration() // 开发阶段使用，生产环境需要 proper migrations
+                .fallbackToDestructiveMigration()
                 .build()
                 INSTANCE = instance
                 instance

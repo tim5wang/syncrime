@@ -15,11 +15,26 @@ object AuthService {
     private const val KEY_EMAIL = "email"
     private const val KEY_NICKNAME = "nickname"
     
-    private lateinit var prefs: SharedPreferences
+    private var prefs: SharedPreferences? = null
+    private var isInitialized = false
     
     fun init(context: Context) {
-        prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        prefs.getString(KEY_TOKEN, null)?.let { ApiClient.setAuthToken(it) }
+        try {
+            prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            prefs?.getString(KEY_TOKEN, null)?.let { ApiClient.setAuthToken(it) }
+            isInitialized = true
+            Log.d(TAG, "AuthService initialized successfully")
+        } catch (e: Exception) {
+            Log.e(TAG, "AuthService init failed", e)
+        }
+    }
+    
+    private fun ensureInitialized(): Boolean {
+        if (!isInitialized || prefs == null) {
+            Log.w(TAG, "AuthService not initialized")
+            return false
+        }
+        return true
     }
     
     suspend fun register(email: String, password: String, nickname: String? = null): AuthResult = withContext(Dispatchers.IO) {
@@ -50,13 +65,28 @@ object AuthService {
         } catch (e: Exception) { AuthResult.Error(e.message ?: "登录失败") }
     }
     
-    fun logout() { prefs.edit().clear().apply(); ApiClient.setAuthToken(null) }
+    fun logout() { 
+        prefs?.edit()?.clear()?.apply()
+        ApiClient.setAuthToken(null) 
+    }
+    
     fun isLoggedIn(): Boolean = ApiClient.getAuthToken() != null
-    fun getUserId(): String? = prefs.getString(KEY_USER_ID, null)
-    fun getNickname(): String? = prefs.getString(KEY_NICKNAME, null)
+    
+    fun getUserId(): String? {
+        return prefs?.getString(KEY_USER_ID, null)
+    }
+    
+    fun getNickname(): String? {
+        return prefs?.getString(KEY_NICKNAME, null)
+    }
     
     private fun saveAuth(token: String, userId: String, email: String, nickname: String) {
-        prefs.edit().putString(KEY_TOKEN, token).putString(KEY_USER_ID, userId).putString(KEY_EMAIL, email).putString(KEY_NICKNAME, nickname).apply()
+        prefs?.edit()
+            ?.putString(KEY_TOKEN, token)
+            ?.putString(KEY_USER_ID, userId)
+            ?.putString(KEY_EMAIL, email)
+            ?.putString(KEY_NICKNAME, nickname)
+            ?.apply()
         ApiClient.setAuthToken(token)
     }
 }
