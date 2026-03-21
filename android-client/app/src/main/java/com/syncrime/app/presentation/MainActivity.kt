@@ -165,7 +165,6 @@ fun SearchTab(viewModel: SearchViewModel = viewModel()) {
 @Composable
 fun LibraryTab(viewModel: LibraryViewModel = viewModel()) {
     val uiState by viewModel.uiState.collectAsState()
-    val context = LocalContext.current
     
     // 刷新剪贴板
     LaunchedEffect(Unit) { viewModel.loadClipboardHistory() }
@@ -189,7 +188,9 @@ fun LibraryTab(viewModel: LibraryViewModel = viewModel()) {
                         items(uiState.recentClipboard) { item ->
                             Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), Arrangement.SpaceBetween, Alignment.CenterVertically) {
                                 Text(item.text.take(30) + if (item.text.length > 30) "..." else "", Modifier.weight(1f))
-                                IconButton({ viewModel.addToClip(item.text) }) { Icon(Icons.Default.Add, "添加到剪藏", Modifier.size(20.dp)) }
+                                IconButton({ viewModel.addToClip(item.text) }) { 
+                                    Icon(Icons.Default.Add, "添加到剪藏", Modifier.size(20.dp)) 
+                                }
                             }
                         }
                     }
@@ -217,7 +218,17 @@ fun LibraryTab(viewModel: LibraryViewModel = viewModel()) {
                 items(uiState.clips) { clip ->
                     Card(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
                         Column(Modifier.padding(12.dp)) {
-                            Text(clip.title, fontWeight = FontWeight.Bold)
+                            Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween) {
+                                Text(clip.title, fontWeight = FontWeight.Bold, Modifier.weight(1f))
+                                Row {
+                                    IconButton({ viewModel.startEdit(clip) }) { 
+                                        Icon(Icons.Default.Edit, "编辑", Modifier.size(18.dp)) 
+                                    }
+                                    IconButton({ viewModel.deleteClip(clip.id) }) { 
+                                        Icon(Icons.Default.Delete, "删除", Modifier.size(18.dp)) 
+                                    }
+                                }
+                            }
                             Spacer(Modifier.height(4.dp))
                             Text(clip.content.take(100) + if (clip.content.length > 100) "..." else "", style = MaterialTheme.typography.bodyMedium)
                             Spacer(Modifier.height(4.dp))
@@ -228,12 +239,37 @@ fun LibraryTab(viewModel: LibraryViewModel = viewModel()) {
             }
         }
         
+        // 消息提示
         uiState.message?.let {
             Spacer(Modifier.height(8.dp))
             Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)) {
                 Text(it, Modifier.padding(12.dp))
             }
             LaunchedEffect(it) { kotlinx.coroutines.delay(2000); viewModel.clearMessage() }
+        }
+        
+        // 编辑对话框
+        uiState.editingClip?.let { clip ->
+            var editTitle by remember { mutableStateOf(clip.title) }
+            var editContent by remember { mutableStateOf(clip.content) }
+            
+            AlertDialog(
+                onDismissRequest = { viewModel.cancelEdit() },
+                title = { Text("编辑剪藏") },
+                text = {
+                    Column {
+                        OutlinedTextField(editTitle, { editTitle = it }, label = { Text("标题") }, modifier = Modifier.fillMaxWidth())
+                        Spacer(Modifier.height(8.dp))
+                        OutlinedTextField(editContent, { editContent = it }, label = { Text("内容") }, modifier = Modifier.fillMaxWidth().height(150.dp), maxLines = 5)
+                    }
+                },
+                confirmButton = {
+                    Button({ viewModel.updateClip(clip.id, editTitle, editContent) }) { Text("保存") }
+                },
+                dismissButton = {
+                    TextButton({ viewModel.cancelEdit() }) { Text("取消") }
+                }
+            )
         }
     }
 }
@@ -244,6 +280,15 @@ fun SettingsTab(viewModel: SettingsViewModel = viewModel()) {
     val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsState()
     var showLoginDialog by remember { mutableStateOf(false) }
+    
+    // 登录成功后自动关闭对话框
+    LaunchedEffect(uiState.loginSuccess) {
+        if (uiState.loginSuccess) {
+            showLoginDialog = false
+            kotlinx.coroutines.delay(2000)
+            viewModel.clearMessage()
+        }
+    }
     
     Column(Modifier.fillMaxSize().padding(16.dp)) {
         Text("设置", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
@@ -290,27 +335,62 @@ fun SettingsTab(viewModel: SettingsViewModel = viewModel()) {
             }
         }
         
-        uiState.message?.let { Spacer(Modifier.height(8.dp)); Text(it, color = MaterialTheme.colorScheme.primary) }
+        // 消息提示
+        uiState.message?.let {
+            Spacer(Modifier.height(8.dp))
+            Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)) {
+                Text(it, Modifier.padding(12.dp), color = MaterialTheme.colorScheme.onPrimaryContainer)
+            }
+        }
     }
     
+    // 登录对话框
     if (showLoginDialog) {
         var email by remember { mutableStateOf("") }
         var password by remember { mutableStateOf("") }
         var nickname by remember { mutableStateOf("") }
         var isRegister by remember { mutableStateOf(false) }
-        AlertDialog({ showLoginDialog = false; viewModel.clearMessage() }, title = { Text(if (isRegister) "注册" else "登录") }, text = {
-            Column {
-                OutlinedTextField(email, { email = it }, label = { Text("邮箱") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                Spacer(Modifier.height(8.dp))
-                OutlinedTextField(password, { password = it }, label = { Text("密码") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                if (isRegister) { Spacer(Modifier.height(8.dp)); OutlinedTextField(nickname, { nickname = it }, label = { Text("昵称") }, singleLine = true, modifier = Modifier.fillMaxWidth()) }
-                uiState.loginError?.let { Spacer(Modifier.height(8.dp)); Text(it, color = MaterialTheme.colorScheme.error) }
+        
+        AlertDialog(
+            onDismissRequest = { showLoginDialog = false; viewModel.clearMessage() },
+            title = { Text(if (isRegister) "注册账号" else "登录") },
+            text = {
+                Column {
+                    OutlinedTextField(email, { email = it }, label = { Text("邮箱") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                    Spacer(Modifier.height(8.dp))
+                    OutlinedTextField(password, { password = it }, label = { Text("密码") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                    if (isRegister) {
+                        Spacer(Modifier.height(8.dp))
+                        OutlinedTextField(nickname, { nickname = it }, label = { Text("昵称（可选）") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                    }
+                    uiState.loginError?.let {
+                        Spacer(Modifier.height(8.dp))
+                        Text(it, color = MaterialTheme.colorScheme.error)
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = { 
+                        if (isRegister) viewModel.register(email, password, nickname.ifBlank { email.split("@").getOrNull(0) ?: "用户" })
+                        else viewModel.login(email, password) 
+                    },
+                    enabled = !uiState.isLoggingIn && email.isNotBlank() && password.isNotBlank()
+                ) {
+                    if (uiState.isLoggingIn) {
+                        CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
+                    } else {
+                        Text(if (isRegister) "注册" else "登录")
+                    }
+                }
+            },
+            dismissButton = {
+                Row {
+                    TextButton({ isRegister = !isRegister }) { Text(if (isRegister) "已有账号" else "注册账号") }
+                    TextButton({ showLoginDialog = false }) { Text("取消") }
+                }
             }
-        }, confirmButton = {
-            Button({ if (isRegister) viewModel.register(email, password, nickname) else viewModel.login(email, password) }, enabled = !uiState.isLoggingIn && email.isNotBlank() && password.isNotBlank()) {
-                if (uiState.isLoggingIn) CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp) else Text(if (isRegister) "注册" else "登录")
-            }
-        }, dismissButton = { TextButton({ isRegister = !isRegister }) { Text(if (isRegister) "去登录" else "去注册") } })
+        )
     }
 }
 

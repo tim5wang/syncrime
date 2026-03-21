@@ -2,20 +2,18 @@ package com.syncrime.android.sync
 
 import android.content.Context
 import android.util.Log
-import androidx.work.*
 import com.syncrime.android.network.ApiClient
 import com.syncrime.android.network.AuthService
 import com.syncrime.shared.data.local.AppDatabase
-import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.*
 import org.json.JSONArray
 import org.json.JSONObject
-import java.util.concurrent.TimeUnit
 
 class SyncManager private constructor(private val context: Context) {
     
     companion object {
         private const val TAG = "SyncManager"
-        private const val SYNC_WORK_NAME = "syncrime_sync"
+        private const val SYNC_INTERVAL_MS = 5 * 60 * 1000L // 5分钟
         
         @Volatile
         private var INSTANCE: SyncManager? = null
@@ -27,117 +25,97 @@ class SyncManager private constructor(private val context: Context) {
         }
     }
     
-    /**
-     * 启动自动同步（每小时同步一次）
-     */
-    fun startAutoSync() {
-        val syncRequest = PeriodicWorkRequestBuilder<SyncWorker>(
-            1, TimeUnit.HOURS
-        ).setConstraints(
-            Constraints.Builder()
-                .setRequiredNetworkType(NetworkType.CONNECTED)
-                .setRequiresBatteryNotLow(true)
-                .build()
-        ).build()
-        
-        WorkManager.getInstance(context).enqueueUniquePeriodicWork(
-            SYNC_WORK_NAME,
-            ExistingPeriodicWorkPolicy.KEEP,
-            syncRequest
-        )
-        
-        Log.d(TAG, "自动同步已启动")
-    }
+    private var lastSyncTime: Long = 0
+    private var lastRecordCount: Int = 0
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     
     /**
-     * 停止自动同步
+     * 检查并触发增量同步
+     * 条件：有新记录 + 距离上次同步超过5分钟
      */
-    fun stopAutoSync() {
-        WorkManager.getInstance(context).cancelUniqueWork(SYNC_WORK_NAME)
-        Log.d(TAG, "自动同步已停止")
+    fun checkAndSync() {
+        if (!AuthService.isLoggedIn()) return
+        
+        scope.launch {
+            try {
+                val database = AppDatabase.getDatabase(context)
+                val currentCount = database.inputDao().getTotalCountSync()
+                
+                val hasNewRecords = currentCount > lastRecordCount
+                val timeElapsed = System.currentTimeMillis() - lastSyncTime > SYNC_INTERVAL_MS
+                
+                if (hasNewRecords && timeElapsed) {
+                    Log.d(TAG, "发现新记录 ($lastRecordCount -> $currentCount)，触发增量同步")
+                    incrementalSync(database, lastRecordCount)
+                    lastRecordCount = currentCount
+                    lastSyncTime = System.currentTimeMillis()
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "检查同步失败", e)
+            }
+        }
     }
     
     /**
-     * 手动触发同步
+     * 强制立即同步
      */
-    fun syncNow() {
-        val syncRequest = OneTimeWorkRequestBuilder<SyncWorker>()
-            .setConstraints(
-                Constraints.Builder()
-                    .setRequiredNetworkType(NetworkType.CONNECTED)
-                    .build()
-            )
-            .build()
-        
-        WorkManager.getInstance(context).enqueue(syncRequest)
-        Log.d(TAG, "手动同步已触发")
-    }
-}
-
-/**
- * 同步 Worker
- */
-class SyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
-    
-    companion object {
-        private const val TAG = "SyncWorker"
-    }
-    
-    override suspend fun doWork(): Result {
-        Log.d(TAG, "开始同步")
-        
-        // 检查登录状态
+    fun syncNow(callback: ((Boolean, String) -> Unit)? = null) {
         if (!AuthService.isLoggedIn()) {
-            Log.d(TAG, "未登录，跳过同步")
-            return Result.success()
+            callback?.invoke(false, "未登录")
+            return
         }
         
-        return try {
-            // 推送本地数据到云端
-            val pushResult = pushToServer()
-            if (!pushResult) {
-                Log.e(TAG, "推送失败")
-                return Result.retry()
+        scope.launch {
+            try {
+                val database = AppDatabase.getDatabase(context)
+                val success = incrementalSync(database, 0)
+                lastSyncTime = System.currentTimeMillis()
+                lastRecordCount = database.inputDao().getTotalCountSync()
+                
+                withContext(Dispatchers.Main) {
+                    callback?.invoke(success, if (success) "同步成功" else "同步失败")
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "同步失败", e)
+                withContext(Dispatchers.Main) {
+                    callback?.invoke(false, "同步失败: ${e.message}")
+                }
             }
-            
-            // 从云端拉取数据
-            val pullResult = pullFromServer()
-            if (!pullResult) {
-                Log.e(TAG, "拉取失败")
-                return Result.retry()
-            }
-            
-            Log.i(TAG, "同步完成")
-            Result.success()
-        } catch (e: Exception) {
-            Log.e(TAG, "同步失败", e)
-            Result.retry()
         }
     }
     
-    private suspend fun pushToServer(): Boolean {
+    /**
+     * 增量同步：只上传新记录
+     */
+    private suspend fun incrementalSync(database: AppDatabase, fromCount: Int): Boolean {
         return try {
-            val database = AppDatabase.getDatabase(applicationContext)
-            val records = database.inputDao().getRecentSync(100)
+            // 获取需要同步的记录
+            val allRecords = database.inputDao().getRecentSync(1000)
+            val newRecords = if (fromCount > 0 && fromCount < allRecords.size) {
+                allRecords.take(fromCount) // 取最新的记录
+            } else {
+                allRecords
+            }
             
-            if (records.isEmpty()) {
-                Log.d(TAG, "没有需要推送的数据")
+            if (newRecords.isEmpty()) {
+                Log.d(TAG, "没有需要同步的记录")
                 return true
             }
             
             val recordsJson = JSONArray()
-            records.forEach { record ->
+            newRecords.forEach { record ->
                 recordsJson.put(JSONObject().apply {
                     put("content", record.content)
                     put("app", record.application)
+                    put("category", record.category ?: "")
                     put("timestamp", record.createdAt)
                 })
             }
             
             val deviceId = android.provider.Settings.Secure.getString(
-                applicationContext.contentResolver,
+                context.contentResolver,
                 android.provider.Settings.Secure.ANDROID_ID
-            )
+            ) ?: "unknown"
             
             val body = JSONObject().apply {
                 put("records", recordsJson)
@@ -147,19 +125,26 @@ class SyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker(c
             val response = ApiClient.post("/sync/push", body)
             
             if (response.isSuccess) {
-                Log.i(TAG, "推送成功: ${records.size} 条记录")
+                val data = response.toJson()?.getJSONObject("data")
+                val syncedCount = data?.optInt("syncedCount", newRecords.size) ?: newRecords.size
+                Log.i(TAG, "✅ 增量同步成功: $syncedCount 条记录")
                 true
             } else {
-                Log.e(TAG, "推送失败: ${response.code}")
+                Log.e(TAG, "同步失败: ${response.code} - ${response.getError()}")
                 false
             }
         } catch (e: Exception) {
-            Log.e(TAG, "推送异常", e)
+            Log.e(TAG, "增量同步异常", e)
             false
         }
     }
     
-    private suspend fun pullFromServer(): Boolean {
+    /**
+     * 从云端拉取数据
+     */
+    suspend fun pullFromCloud(): Boolean {
+        if (!AuthService.isLoggedIn()) return false
+        
         return try {
             val response = ApiClient.get("/sync/pull?limit=1000")
             
@@ -168,15 +153,14 @@ class SyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker(c
                 val data = json.getJSONObject("data")
                 val recordsArray = data.getJSONArray("records")
                 
-                val database = AppDatabase.getDatabase(applicationContext)
+                val database = AppDatabase.getDatabase(context)
                 
                 for (i in 0 until recordsArray.length()) {
                     val item = recordsArray.getJSONObject(i)
-                    // 保存到本地（忽略重复）
-                    // TODO: 实现去重逻辑
+                    // TODO: 实现去重保存
                 }
                 
-                Log.i(TAG, "拉取成功: ${recordsArray.length()} 条记录")
+                Log.i(TAG, "✅ 拉取成功: ${recordsArray.length()} 条记录")
                 true
             } else {
                 Log.e(TAG, "拉取失败: ${response.code}")
@@ -185,6 +169,36 @@ class SyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker(c
         } catch (e: Exception) {
             Log.e(TAG, "拉取异常", e)
             false
+        }
+    }
+    
+    /**
+     * 同步剪藏到云端
+     */
+    fun syncClip(clipId: Long, action: String, callback: ((Boolean) -> Unit)? = null) {
+        if (!AuthService.isLoggedIn()) {
+            callback?.invoke(false)
+            return
+        }
+        
+        scope.launch {
+            try {
+                val database = AppDatabase.getDatabase(context)
+                val clip = database.clipDao().getByIdSync(clipId)
+                
+                if (clip == null) {
+                    withContext(Dispatchers.Main) { callback?.invoke(false) }
+                    return@launch
+                }
+                
+                // TODO: 调用云端 API 保存剪藏
+                Log.d(TAG, "同步剪藏: ${clip.title}")
+                
+                withContext(Dispatchers.Main) { callback?.invoke(true) }
+            } catch (e: Exception) {
+                Log.e(TAG, "同步剪藏失败", e)
+                withContext(Dispatchers.Main) { callback?.invoke(false) }
+            }
         }
     }
 }

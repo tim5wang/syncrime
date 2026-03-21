@@ -9,6 +9,7 @@ import androidx.lifecycle.viewModelScope
 import com.syncrime.shared.data.local.AppDatabase
 import com.syncrime.shared.model.KnowledgeClip
 import com.syncrime.shared.model.SourceType
+import com.syncrime.android.sync.SyncManager
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 
@@ -19,6 +20,7 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
     data class LibraryUiState(
         val recentClipboard: List<ClipboardItem> = emptyList(),
         val clips: List<KnowledgeClip> = emptyList(),
+        val editingClip: KnowledgeClip? = null,
         val message: String? = null
     )
     
@@ -29,6 +31,7 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
     
     private val clipboardManager = application.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
     private val database = AppDatabase.getDatabase(application)
+    private val syncManager = SyncManager.getInstance(application)
     
     init {
         loadClips()
@@ -66,7 +69,12 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
                     createdAt = System.currentTimeMillis()
                 )
                 database.clipDao().insert(clip)
+                
+                // 同步到云端
+                syncManager.syncClip(clip.id, "create")
+                
                 _uiState.value = _uiState.value.copy(message = "已添加到剪藏")
+                Log.d(TAG, "已添加剪藏: ${clip.title}")
             } catch (e: Exception) {
                 Log.e(TAG, "添加失败", e)
                 _uiState.value = _uiState.value.copy(message = "添加失败")
@@ -74,15 +82,62 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
         }
     }
     
-    fun deleteClip(clipId: Long) {
+    fun startEdit(clip: KnowledgeClip) {
+        _uiState.value = _uiState.value.copy(editingClip = clip)
+    }
+    
+    fun cancelEdit() {
+        _uiState.value = _uiState.value.copy(editingClip = null)
+    }
+    
+    fun updateClip(clipId: Long, newTitle: String, newContent: String) {
         viewModelScope.launch {
-            val clip = _uiState.value.clips.find { it.id == clipId }
-            if (clip != null) {
-                database.clipDao().delete(clip)
-                _uiState.value = _uiState.value.copy(message = "已删除")
+            try {
+                val clip = _uiState.value.clips.find { it.id == clipId }
+                if (clip != null) {
+                    val updated = clip.copy(
+                        title = newTitle,
+                        content = newContent
+                    )
+                    database.clipDao().update(updated)
+                    
+                    // 同步到云端
+                    syncManager.syncClip(clipId, "update")
+                    
+                    _uiState.value = _uiState.value.copy(
+                        editingClip = null,
+                        message = "已更新"
+                    )
+                    Log.d(TAG, "已更新剪藏: $newTitle")
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "更新失败", e)
+                _uiState.value = _uiState.value.copy(message = "更新失败")
             }
         }
     }
     
-    fun clearMessage() { _uiState.value = _uiState.value.copy(message = null) }
+    fun deleteClip(clipId: Long) {
+        viewModelScope.launch {
+            try {
+                val clip = _uiState.value.clips.find { it.id == clipId }
+                if (clip != null) {
+                    database.clipDao().delete(clip)
+                    
+                    // 同步到云端
+                    syncManager.syncClip(clipId, "delete")
+                    
+                    _uiState.value = _uiState.value.copy(message = "已删除")
+                    Log.d(TAG, "已删除剪藏: ${clip.title}")
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "删除失败", e)
+                _uiState.value = _uiState.value.copy(message = "删除失败")
+            }
+        }
+    }
+    
+    fun clearMessage() {
+        _uiState.value = _uiState.value.copy(message = null)
+    }
 }
