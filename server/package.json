@@ -1,0 +1,46 @@
+{
+  "name": "syncrime-server",
+  "version": "1.0.0",
+  "description": "SyncRime lightweight backend server",
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "test": "vitest",
+    "lint": "eslint src/",
+    "db:init": "tsx scripts/init-db.ts",
+    "db:migrate": "tsx scripts/migrate.ts"
+  },
+  "keywords": ["syncrime", "input-method", "ai", "fastify"],
+  "author": "SyncRime Team",
+  "license": "MIT",
+  "dependencies": {
+    "fastify": "^4.26.2",
+    "@fastify/jwt": "^8.0.0",
+    "@fastify/cors": "^9.0.1",
+    "@fastify/rate-limit": "^9.1.0",
+    "better-sqlite3": "^9.4.3",
+    "axios": "^1.6.8",
+    "bcryptjs": "^2.4.3",
+    "uuid": "^9.0.1",
+    "dotenv": "^16.4.5",
+    "zod": "^3.22.4"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.30",
+    "@types/better-sqlite3": "^7.6.9",
+    "@types/bcryptjs": "^2.4.6",
+    "@types/uuid": "^9.0.8",
+    "typescript": "^5.4.3",
+    "tsx": "^4.7.1",
+    "vitest": "^1.4.0",
+    "eslint": "^8.57.0",
+    "@typescript-eslint/eslint-plugin": "^7.3.1",
+    "@typescript-eslint/parser": "^7.3.1"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

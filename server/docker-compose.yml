@@ -1,0 +1,13 @@
+version: '3.8'
+services:
+  syncrime-server:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - JWT_SECRET=change-this-in-production
+      - DASHSCOPE_API_KEY=${DASHSCOPE_API_KEY}
+    volumes:
+      - ./data:/app/data
+    restart: unless-stopped
