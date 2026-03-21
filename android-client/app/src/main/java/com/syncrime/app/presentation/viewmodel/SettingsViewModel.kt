@@ -5,18 +5,14 @@ import android.content.Context
 import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.syncrime.android.network.AuthService
+import com.syncrime.android.network.AuthResult
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 
 class SettingsViewModel(application: Application) : AndroidViewModel(application) {
     
-    companion object {
-        private const val TAG = "SettingsViewModel"
-        private const val PREFS_NAME = "syncrime_settings"
-        private const val KEY_AUTO_SAVE = "auto_save"
-        private const val KEY_PRIVACY_FILTER = "privacy_filter"
-        private const val KEY_CLEANUP_DAYS = "cleanup_days"
-    }
+    companion object { private const val TAG = "SettingsViewModel"; private const val PREFS_NAME = "syncrime_settings" }
     
     data class SettingsUiState(
         val autoSave: Boolean = true,
@@ -25,39 +21,88 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         val isLoggedIn: Boolean = false,
         val userEmail: String? = null,
         val userNickname: String? = null,
+        val isLoggingIn: Boolean = false,
+        val loginError: String? = null,
         val message: String? = null
     )
     
     private val _uiState = MutableStateFlow(SettingsUiState())
     val uiState: StateFlow<SettingsUiState> = _uiState.asStateFlow()
-    
     private val prefs = application.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
     
     init {
-        Log.d(TAG, "SettingsViewModel init")
         loadSettings()
+        checkLogin()
     }
     
     private fun loadSettings() {
         _uiState.value = _uiState.value.copy(
-            autoSave = prefs.getBoolean(KEY_AUTO_SAVE, true),
-            privacyFilter = prefs.getBoolean(KEY_PRIVACY_FILTER, true),
-            cleanupDays = prefs.getInt(KEY_CLEANUP_DAYS, 30)
+            autoSave = prefs.getBoolean("auto_save", true),
+            privacyFilter = prefs.getBoolean("privacy_filter", true),
+            cleanupDays = prefs.getInt("cleanup_days", 30)
+        )
+    }
+    
+    private fun checkLogin() {
+        _uiState.value = _uiState.value.copy(
+            isLoggedIn = AuthService.isLoggedIn(),
+            userNickname = AuthService.getNickname(),
+            userEmail = AuthService.getEmail()
         )
     }
     
     fun setAutoSave(enabled: Boolean) {
-        prefs.edit().putBoolean(KEY_AUTO_SAVE, enabled).apply()
+        prefs.edit().putBoolean("auto_save", enabled).apply()
         _uiState.value = _uiState.value.copy(autoSave = enabled)
     }
     
     fun setPrivacyFilter(enabled: Boolean) {
-        prefs.edit().putBoolean(KEY_PRIVACY_FILTER, enabled).apply()
+        prefs.edit().putBoolean("privacy_filter", enabled).apply()
         _uiState.value = _uiState.value.copy(privacyFilter = enabled)
     }
     
-    fun setCleanupDays(days: Int) {
-        prefs.edit().putInt(KEY_CLEANUP_DAYS, days).apply()
-        _uiState.value = _uiState.value.copy(cleanupDays = days)
+    fun login(email: String, password: String) {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isLoggingIn = true, loginError = null)
+            when (val result = AuthService.login(email, password)) {
+                is AuthResult.Success -> {
+                    _uiState.value = _uiState.value.copy(
+                        isLoggedIn = true, userNickname = AuthService.getNickname(),
+                        userEmail = AuthService.getEmail(), isLoggingIn = false, message = "登录成功"
+                    )
+                    Log.d(TAG, "Login success")
+                }
+                is AuthResult.Error -> {
+                    _uiState.value = _uiState.value.copy(isLoggingIn = false, loginError = result.message)
+                    Log.e(TAG, "Login failed: ${result.message}")
+                }
+            }
+        }
     }
+    
+    fun register(email: String, password: String, nickname: String) {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isLoggingIn = true, loginError = null)
+            when (val result = AuthService.register(email, password, nickname)) {
+                is AuthResult.Success -> {
+                    _uiState.value = _uiState.value.copy(
+                        isLoggedIn = true, userNickname = AuthService.getNickname(),
+                        userEmail = AuthService.getEmail(), isLoggingIn = false, message = "注册成功"
+                    )
+                    Log.d(TAG, "Register success")
+                }
+                is AuthResult.Error -> {
+                    _uiState.value = _uiState.value.copy(isLoggingIn = false, loginError = result.message)
+                    Log.e(TAG, "Register failed: ${result.message}")
+                }
+            }
+        }
+    }
+    
+    fun logout() {
+        AuthService.logout()
+        _uiState.value = _uiState.value.copy(isLoggedIn = false, userNickname = null, userEmail = null, message = "已退出")
+    }
+    
+    fun clearMessage() { _uiState.value = _uiState.value.copy(message = null, loginError = null) }
 }
