@@ -1,6 +1,7 @@
 package com.syncrime.android.presentation.ui.main
 
 import android.app.Application
+import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.syncrime.android.data.local.database.SyncRimeDatabase
@@ -11,17 +12,21 @@ import com.syncrime.android.domain.usecase.EndInputSessionUseCase
 import com.syncrime.android.domain.usecase.GetStatisticsUseCase
 import com.syncrime.android.domain.usecase.RecordInputUseCase
 import com.syncrime.android.domain.usecase.StartInputSessionUseCase
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 /**
  * 主界面 ViewModel
  */
 class MainViewModel(application: Application) : AndroidViewModel(application) {
+    
+    companion object { private const val TAG = "MainViewModel" }
     
     private val database = SyncRimeDatabase.getDatabase(application)
     private val inputRepository = InputRepository(
@@ -41,42 +46,55 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _syncStatus = MutableStateFlow(SyncStatus())
     val syncStatus: StateFlow<SyncStatus> = _syncStatus.asStateFlow()
     
+    // Track collection jobs to prevent memory leaks
+    private var statisticsJob: Job? = null
+    private var syncStatusJob: Job? = null
+    
     init {
         loadStatistics()
         observeSyncStatus()
     }
     
     private fun loadStatistics() {
-        viewModelScope.launch {
+        // Cancel previous job to prevent memory leaks
+        statisticsJob?.cancel()
+        
+        statisticsJob = viewModelScope.launch {
             getStatisticsUseCase()
                 .catch { e ->
-                    _uiState.value = _uiState.value.copy(error = e.message)
+                    if (isActive) {
+                        _uiState.update { it.copy(error = e.message) }
+                    }
                 }
                 .collect { stats ->
-                    _uiState.value = _uiState.value.copy(
-                        isLoading = false
-                        // 这里可以根据统计数据更新 UI
-                    )
+                    if (isActive) {
+                        _uiState.update { it.copy(isLoading = false) }
+                    }
                 }
         }
     }
     
     private fun observeSyncStatus() {
-        viewModelScope.launch {
+        // Cancel previous job to prevent memory leaks
+        syncStatusJob?.cancel()
+        
+        syncStatusJob = viewModelScope.launch {
             syncRepository.getLatestSyncRecord()
                 .catch { e -> /* handle error */ }
                 .collect { record ->
-                    record?.let { rec ->
-                        val status = when (rec.status) {
-                            SyncRecordEntity.SyncStatus.IN_PROGRESS -> SyncStatus.Status.SYNCING
-                            SyncRecordEntity.SyncStatus.SUCCESS -> SyncStatus.Status.SUCCESS
-                            SyncRecordEntity.SyncStatus.FAILED -> SyncStatus.Status.ERROR
-                            else -> SyncStatus.Status.IDLE
+                    if (isActive) {
+                        record?.let { rec ->
+                            val status = when (rec.status) {
+                                SyncRecordEntity.SyncStatus.IN_PROGRESS -> SyncStatus.Status.SYNCING
+                                SyncRecordEntity.SyncStatus.SUCCESS -> SyncStatus.Status.SUCCESS
+                                SyncRecordEntity.SyncStatus.FAILED -> SyncStatus.Status.ERROR
+                                else -> SyncStatus.Status.IDLE
+                            }
+                            _syncStatus.value = SyncStatus(
+                                status = status,
+                                lastSyncTime = rec.endTime
+                            )
                         }
-                        _syncStatus.value = SyncStatus(
-                            status = status,
-                            lastSyncTime = rec.endTime
-                        )
                     }
                 }
         }
@@ -85,9 +103,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun onEvent(event: MainUiEvent) {
         when (event) {
             is MainUiEvent.Refresh -> loadStatistics()
-            is MainUiEvent.ClearError -> _uiState.value = _uiState.value.copy(error = null)
+            is MainUiEvent.ClearError -> _uiState.update { it.copy(error = null) }
             is MainUiEvent.SyncData -> syncData()
-            is MainUiEvent.ShowError -> _uiState.value = _uiState.value.copy(error = event.message)
+            is MainUiEvent.ShowError -> _uiState.update { it.copy(error = event.message) }
         }
     }
     
@@ -107,7 +125,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     application = "示例应用",
                     packageName = "com.example.app"
                 )
-                _uiState.value = _uiState.value.copy(
+                _uiState.update { it.copy(
                     isCapturing = true,
                     currentSession = InputSession(
                         id = session.id,
@@ -115,9 +133,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         startTime = session.startTime,
                         inputCount = session.inputCount
                     )
-                )
+                )}
             } catch (e: Exception) {
-                _uiState.value = _uiState.value.copy(error = e.message)
+                _uiState.update { it.copy(error = e.message) }
             }
         }
     }
@@ -128,12 +146,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 _uiState.value.currentSession?.let { session ->
                     endSessionUseCase(session.id)
                 }
-                _uiState.value = _uiState.value.copy(
+                _uiState.update { it.copy(
                     isCapturing = false,
                     currentSession = null
-                )
+                )}
             } catch (e: Exception) {
-                _uiState.value = _uiState.value.copy(error = e.message)
+                _uiState.update { it.copy(error = e.message) }
             }
         }
     }
@@ -149,12 +167,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         characterCount = characterCount
                     )
                     val updatedSession = session.copy(inputCount = session.inputCount + 1)
-                    _uiState.value = _uiState.value.copy(
-                        currentSession = updatedSession
-                    )
+                    _uiState.update { it.copy(currentSession = updatedSession) }
                 }
             } catch (e: Exception) {
-                _uiState.value = _uiState.value.copy(error = e.message)
+                _uiState.update { it.copy(error = e.message) }
             }
         }
     }
@@ -162,18 +178,25 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private fun syncData() {
         viewModelScope.launch {
             try {
-                _syncStatus.value = _syncStatus.value.copy(status = SyncStatus.Status.SYNCING)
+                _syncStatus.update { it.copy(status = SyncStatus.Status.SYNCING) }
                 // TODO: 实现实际同步逻辑
                 // 模拟同步延迟
                 kotlinx.coroutines.delay(1000)
-                _syncStatus.value = _syncStatus.value.copy(
+                _syncStatus.update { it.copy(
                     status = SyncStatus.Status.SUCCESS,
                     lastSyncTime = System.currentTimeMillis()
-                )
+                )}
             } catch (e: Exception) {
-                _syncStatus.value = _syncStatus.value.copy(status = SyncStatus.Status.ERROR)
-                _uiState.value = _uiState.value.copy(error = e.message)
+                _syncStatus.update { it.copy(status = SyncStatus.Status.ERROR) }
+                _uiState.update { it.copy(error = e.message) }
             }
         }
+    }
+    
+    override fun onCleared() {
+        super.onCleared()
+        statisticsJob?.cancel()
+        syncStatusJob?.cancel()
+        Log.d(TAG, "MainViewModel cleared, jobs cancelled")
     }
 }

@@ -6,8 +6,9 @@ import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.syncrime.app.data.DataRepository
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.*
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.isActive
 
 class HomeViewModel(application: Application) : AndroidViewModel(application) {
     
@@ -26,6 +27,10 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     
     private val repository: DataRepository = DataRepository.getInstance(application)
     
+    // Track collection jobs to prevent memory leaks
+    private var todayCountJob: Job? = null
+    private var totalCountJob: Job? = null
+    
     init {
         Log.d(TAG, "HomeViewModel init")
         loadStats()
@@ -33,22 +38,40 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     }
     
     fun loadStats() {
-        viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isLoading = true, error = null)
-            repository.getTodayCount().catch { 
-                _uiState.value = _uiState.value.copy(error = it.message)
-            }.collect { _uiState.value = _uiState.value.copy(todayInputCount = it) }
+        // Cancel previous jobs to prevent memory leaks from multiple collectors
+        todayCountJob?.cancel()
+        totalCountJob?.cancel()
+        
+        _uiState.update { it.copy(isLoading = true, error = null) }
+        
+        todayCountJob = viewModelScope.launch {
+            repository.getTodayCount()
+                .catch { e -> 
+                    if (isActive) {
+                        _uiState.update { it.copy(error = e.message) }
+                    }
+                }
+                .collect { count -> 
+                    if (isActive) {
+                        _uiState.update { it.copy(todayInputCount = count) }
+                    }
+                }
         }
-        viewModelScope.launch {
-            repository.getTotalCount().catch { }.collect { 
-                _uiState.value = _uiState.value.copy(totalInputCount = it, isLoading = false)
-            }
+        
+        totalCountJob = viewModelScope.launch {
+            repository.getTotalCount()
+                .catch { /* silently handle */ }
+                .collect { count -> 
+                    if (isActive) {
+                        _uiState.update { it.copy(totalInputCount = count, isLoading = false) }
+                    }
+                }
         }
     }
     
     fun checkAccessibilityStatus() {
         val enabled = isAccessibilityServiceEnabled()
-        _uiState.value = _uiState.value.copy(isAccessibilityEnabled = enabled)
+        _uiState.update { it.copy(isAccessibilityEnabled = enabled) }
         Log.d(TAG, "Accessibility enabled: $enabled")
     }
     
@@ -69,5 +92,13 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     fun refresh() { 
         loadStats()
         checkAccessibilityStatus()
+    }
+    
+    override fun onCleared() {
+        super.onCleared()
+        // Clean up jobs when ViewModel is destroyed
+        todayCountJob?.cancel()
+        totalCountJob?.cancel()
+        Log.d(TAG, "HomeViewModel cleared, jobs cancelled")
     }
 }

@@ -10,8 +10,9 @@ import com.syncrime.shared.data.local.AppDatabase
 import com.syncrime.shared.model.KnowledgeClip
 import com.syncrime.shared.model.SourceType
 import com.syncrime.android.sync.SyncManager
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.*
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.isActive
 
 class LibraryViewModel(application: Application) : AndroidViewModel(application) {
     
@@ -33,16 +34,26 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
     private val database = AppDatabase.getDatabase(application)
     private val syncManager = SyncManager.getInstance(application)
     
+    // Track collection job to prevent memory leaks
+    private var clipsJob: Job? = null
+    
     init {
         loadClips()
         loadClipboardHistory()
     }
     
     private fun loadClips() {
-        viewModelScope.launch {
-            database.clipDao().getAll().catch { }.collect { clips ->
-                _uiState.value = _uiState.value.copy(clips = clips)
-            }
+        // Cancel previous job to prevent memory leaks
+        clipsJob?.cancel()
+        
+        clipsJob = viewModelScope.launch {
+            database.clipDao().getAll()
+                .catch { /* handle error silently */ }
+                .collect { clips ->
+                    if (isActive) {
+                        _uiState.value = _uiState.value.copy(clips = clips)
+                    }
+                }
         }
     }
     
@@ -139,5 +150,11 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
     
     fun clearMessage() {
         _uiState.value = _uiState.value.copy(message = null)
+    }
+    
+    override fun onCleared() {
+        super.onCleared()
+        clipsJob?.cancel()
+        Log.d(TAG, "LibraryViewModel cleared, jobs cancelled")
     }
 }

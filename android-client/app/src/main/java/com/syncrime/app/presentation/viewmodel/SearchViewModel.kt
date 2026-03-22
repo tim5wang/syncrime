@@ -6,8 +6,9 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.syncrime.app.data.DataRepository
 import com.syncrime.shared.model.InputRecord
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.*
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.isActive
 
 class SearchViewModel(application: Application) : AndroidViewModel(application) {
     
@@ -27,18 +28,27 @@ class SearchViewModel(application: Application) : AndroidViewModel(application) 
     
     private val repository: DataRepository = DataRepository.getInstance(application)
     
+    // Track collection jobs to prevent memory leaks
+    private var recentRecordsJob: Job? = null
+    private var searchJob: Job? = null
+    
     init {
         // 加载最近记录作为默认展示
         loadRecentRecords()
     }
     
     private fun loadRecentRecords() {
-        viewModelScope.launch {
+        // Cancel previous job to prevent memory leaks
+        recentRecordsJob?.cancel()
+        
+        recentRecordsJob = viewModelScope.launch {
             repository.getRecentRecords()
                 .catch { e -> Log.e(TAG, "加载最近记录失败", e) }
                 .collect { records ->
-                    Log.d(TAG, "加载最近记录: ${records.size} 条")
-                    _uiState.value = _uiState.value.copy(recentRecords = records)
+                    if (isActive) {
+                        Log.d(TAG, "加载最近记录: ${records.size} 条")
+                        _uiState.value = _uiState.value.copy(recentRecords = records)
+                    }
                 }
         }
     }
@@ -57,29 +67,42 @@ class SearchViewModel(application: Application) : AndroidViewModel(application) 
         if (query.isBlank()) return
         
         Log.d(TAG, "搜索: $query")
-        viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isSearching = true, hasSearched = true, error = null)
+        
+        // Cancel previous search job to prevent memory leaks
+        searchJob?.cancel()
+        
+        searchJob = viewModelScope.launch {
+            _uiState.update { it.copy(isSearching = true, hasSearched = true, error = null) }
             
             repository.searchRecords(query)
                 .catch { e ->
-                    Log.e(TAG, "搜索失败", e)
-                    _uiState.value = _uiState.value.copy(error = e.message, isSearching = false)
+                    if (isActive) {
+                        Log.e(TAG, "搜索失败", e)
+                        _uiState.update { it.copy(error = e.message, isSearching = false) }
+                    }
                 }
                 .collect { results ->
-                    Log.d(TAG, "搜索结果: ${results.size} 条")
-                    _uiState.value = _uiState.value.copy(
-                        results = results,
-                        isSearching = false
-                    )
+                    if (isActive) {
+                        Log.d(TAG, "搜索结果: ${results.size} 条")
+                        _uiState.update { it.copy(results = results, isSearching = false) }
+                    }
                 }
         }
     }
     
     fun clearSearch() { 
+        searchJob?.cancel()
         _uiState.value = _uiState.value.copy(
             query = "", 
             results = emptyList(), 
             hasSearched = false
         )
+    }
+    
+    override fun onCleared() {
+        super.onCleared()
+        recentRecordsJob?.cancel()
+        searchJob?.cancel()
+        Log.d(TAG, "SearchViewModel cleared, jobs cancelled")
     }
 }
