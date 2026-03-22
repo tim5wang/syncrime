@@ -11,14 +11,18 @@ import kotlinx.coroutines.launch
 
 class SearchViewModel(application: Application) : AndroidViewModel(application) {
     
-    companion object { private const val TAG = "SearchViewModel" }
+    companion object { 
+        private const val TAG = "SearchViewModel"
+    }
     
     data class SearchUiState(
         val query: String = "",
         val isSearching: Boolean = false,
         val results: List<InputRecord> = emptyList(),
         val recentRecords: List<InputRecord> = emptyList(),
+        val searchHistory: List<String> = emptyList(),
         val hasSearched: Boolean = false,
+        val showHistory: Boolean = true,
         val error: String? = null
     )
     
@@ -26,9 +30,9 @@ class SearchViewModel(application: Application) : AndroidViewModel(application) 
     val uiState: StateFlow<SearchUiState> = _uiState.asStateFlow()
     
     private val repository: DataRepository = DataRepository.getInstance(application)
+    private val searchHistory = mutableListOf<String>()
     
     init {
-        // 加载最近记录作为默认展示
         loadRecentRecords()
     }
     
@@ -44,12 +48,16 @@ class SearchViewModel(application: Application) : AndroidViewModel(application) 
     }
     
     fun setQuery(query: String) {
-        _uiState.value = _uiState.value.copy(query = query)
-        if (query.isNotBlank()) {
-            search(query)
-        } else {
-            // 清空搜索，恢复显示最近记录
-            _uiState.value = _uiState.value.copy(results = emptyList(), hasSearched = false)
+        _uiState.value = _uiState.value.copy(
+            query = query,
+            showHistory = query.isBlank()
+        )
+        
+        if (query.isBlank()) {
+            _uiState.value = _uiState.value.copy(
+                results = emptyList(),
+                hasSearched = false
+            )
         }
     }
     
@@ -58,7 +66,12 @@ class SearchViewModel(application: Application) : AndroidViewModel(application) 
         
         Log.d(TAG, "搜索: $query")
         viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isSearching = true, hasSearched = true, error = null)
+            _uiState.value = _uiState.value.copy(
+                isSearching = true,
+                hasSearched = true,
+                showHistory = false,
+                error = null
+            )
             
             repository.searchRecords(query)
                 .catch { e ->
@@ -71,15 +84,36 @@ class SearchViewModel(application: Application) : AndroidViewModel(application) 
                         results = results,
                         isSearching = false
                     )
+                    
+                    // 添加到搜索历史
+                    if (searchHistory.contains(query)) {
+                        searchHistory.remove(query)
+                    }
+                    searchHistory.add(0, query)
+                    if (searchHistory.size > 10) {
+                        searchHistory.removeLast()
+                    }
+                    _uiState.value = _uiState.value.copy(searchHistory = searchHistory.toList())
                 }
         }
+    }
+    
+    fun searchFromHistory(query: String) {
+        _uiState.value = _uiState.value.copy(query = query)
+        search(query)
+    }
+    
+    fun clearHistory() {
+        searchHistory.clear()
+        _uiState.value = _uiState.value.copy(searchHistory = emptyList())
     }
     
     fun clearSearch() { 
         _uiState.value = _uiState.value.copy(
             query = "", 
             results = emptyList(), 
-            hasSearched = false
+            hasSearched = false,
+            showHistory = true
         )
     }
 }
