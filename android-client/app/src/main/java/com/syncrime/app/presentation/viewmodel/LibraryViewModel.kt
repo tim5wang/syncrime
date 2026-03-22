@@ -10,9 +10,8 @@ import com.syncrime.shared.data.local.AppDatabase
 import com.syncrime.shared.model.KnowledgeClip
 import com.syncrime.shared.model.SourceType
 import com.syncrime.android.sync.SyncManager
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.*
-import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 
 class LibraryViewModel(application: Application) : AndroidViewModel(application) {
     
@@ -21,7 +20,11 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
     data class LibraryUiState(
         val recentClipboard: List<ClipboardItem> = emptyList(),
         val clips: List<KnowledgeClip> = emptyList(),
+        val selectedClip: KnowledgeClip? = null,
         val editingClip: KnowledgeClip? = null,
+        val isLoading: Boolean = false,
+        val searchQuery: String = "",
+        val filteredClips: List<KnowledgeClip> = emptyList(),
         val message: String? = null
     )
     
@@ -34,27 +37,39 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
     private val database = AppDatabase.getDatabase(application)
     private val syncManager = SyncManager.getInstance(application)
     
-    // Track collection job to prevent memory leaks
-    private var clipsJob: Job? = null
-    
     init {
         loadClips()
         loadClipboardHistory()
     }
     
     private fun loadClips() {
-        // Cancel previous job to prevent memory leaks
-        clipsJob?.cancel()
-        
-        clipsJob = viewModelScope.launch {
-            database.clipDao().getAll()
-                .catch { /* handle error silently */ }
-                .collect { clips ->
-                    if (isActive) {
-                        _uiState.value = _uiState.value.copy(clips = clips)
-                    }
-                }
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isLoading = true)
+            database.clipDao().getAll().catch { }.collect { clips ->
+                _uiState.value = _uiState.value.copy(
+                    clips = clips,
+                    filteredClips = if (_uiState.value.searchQuery.isBlank()) clips else filterClips(clips, _uiState.value.searchQuery),
+                    isLoading = false
+                )
+            }
         }
+    }
+    
+    private fun filterClips(clips: List<KnowledgeClip>, query: String): List<KnowledgeClip> {
+        val lowerQuery = query.lowercase()
+        return clips.filter { clip ->
+            clip.title.lowercase().contains(lowerQuery) ||
+            clip.content.lowercase().contains(lowerQuery) ||
+            clip.category?.lowercase()?.contains(lowerQuery) == true ||
+            clip.tags.any { it.lowercase().contains(lowerQuery) }
+        }
+    }
+    
+    fun setSearchQuery(query: String) {
+        _uiState.value = _uiState.value.copy(
+            searchQuery = query,
+            filteredClips = if (query.isBlank()) _uiState.value.clips else filterClips(_uiState.value.clips, query)
+        )
     }
     
     fun loadClipboardHistory() {
@@ -80,10 +95,7 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
                     createdAt = System.currentTimeMillis()
                 )
                 database.clipDao().insert(clip)
-                
-                // 同步到云端
                 syncManager.syncClip(clip.id, "create")
-                
                 _uiState.value = _uiState.value.copy(message = "已添加到剪藏")
                 Log.d(TAG, "已添加剪藏: ${clip.title}")
             } catch (e: Exception) {
@@ -91,6 +103,14 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
                 _uiState.value = _uiState.value.copy(message = "添加失败")
             }
         }
+    }
+    
+    fun selectClip(clip: KnowledgeClip) {
+        _uiState.value = _uiState.value.copy(selectedClip = clip)
+    }
+    
+    fun clearSelectedClip() {
+        _uiState.value = _uiState.value.copy(selectedClip = null)
     }
     
     fun startEdit(clip: KnowledgeClip) {
@@ -101,26 +121,17 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
         _uiState.value = _uiState.value.copy(editingClip = null)
     }
     
-    fun updateClip(clipId: Long, newTitle: String, newContent: String) {
+    fun updateClip(updatedClip: KnowledgeClip) {
         viewModelScope.launch {
             try {
-                val clip = _uiState.value.clips.find { it.id == clipId }
-                if (clip != null) {
-                    val updated = clip.copy(
-                        title = newTitle,
-                        content = newContent
-                    )
-                    database.clipDao().update(updated)
-                    
-                    // 同步到云端
-                    syncManager.syncClip(clipId, "update")
-                    
-                    _uiState.value = _uiState.value.copy(
-                        editingClip = null,
-                        message = "已更新"
-                    )
-                    Log.d(TAG, "已更新剪藏: $newTitle")
-                }
+                database.clipDao().update(updatedClip)
+                syncManager.syncClip(updatedClip.id, "update")
+                _uiState.value = _uiState.value.copy(
+                    editingClip = null,
+                    selectedClip = null,
+                    message = "已更新"
+                )
+                Log.d(TAG, "已更新剪藏: ${updatedClip.title}")
             } catch (e: Exception) {
                 Log.e(TAG, "更新失败", e)
                 _uiState.value = _uiState.value.copy(message = "更新失败")
@@ -134,11 +145,11 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
                 val clip = _uiState.value.clips.find { it.id == clipId }
                 if (clip != null) {
                     database.clipDao().delete(clip)
-                    
-                    // 同步到云端
                     syncManager.syncClip(clipId, "delete")
-                    
-                    _uiState.value = _uiState.value.copy(message = "已删除")
+                    _uiState.value = _uiState.value.copy(
+                        selectedClip = null,
+                        message = "已删除"
+                    )
                     Log.d(TAG, "已删除剪藏: ${clip.title}")
                 }
             } catch (e: Exception) {
@@ -148,13 +159,17 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
         }
     }
     
-    fun clearMessage() {
-        _uiState.value = _uiState.value.copy(message = null)
+    fun incrementViewCount(clipId: Long) {
+        viewModelScope.launch {
+            try {
+                database.clipDao().incrementViewCount(clipId)
+            } catch (e: Exception) {
+                Log.e(TAG, "更新查看次数失败", e)
+            }
+        }
     }
     
-    override fun onCleared() {
-        super.onCleared()
-        clipsJob?.cancel()
-        Log.d(TAG, "LibraryViewModel cleared, jobs cancelled")
+    fun clearMessage() {
+        _uiState.value = _uiState.value.copy(message = null)
     }
 }
