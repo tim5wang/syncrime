@@ -5,7 +5,6 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -15,20 +14,14 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.syncrime.app.presentation.viewmodel.HomeViewModel
 import com.syncrime.app.presentation.viewmodel.LibraryViewModel
 import com.syncrime.app.presentation.viewmodel.SearchViewModel
 import com.syncrime.app.presentation.viewmodel.SettingsViewModel
-import com.syncrime.app.presentation.library.ClipDetailScreen
-import com.syncrime.app.util.TextHighlight
 import com.syncrime.android.debug.DebugViewModel
 import java.text.SimpleDateFormat
 import java.util.*
@@ -107,12 +100,10 @@ fun HomeTab(viewModel: HomeViewModel) {
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SearchTab(viewModel: SearchViewModel = viewModel()) {
     val uiState by viewModel.uiState.collectAsState()
     val displayRecords = if (uiState.hasSearched) uiState.results else uiState.recentRecords
-    var showClearHistoryDialog by remember { mutableStateOf(false) }
     
     Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
         Text(if (uiState.hasSearched) "🔍 搜索结果" else "📝 最近输入", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
@@ -126,43 +117,11 @@ fun SearchTab(viewModel: SearchViewModel = viewModel()) {
             leadingIcon = { Icon(Icons.Default.Search, null) },
             trailingIcon = {
                 if (uiState.query.isNotEmpty()) {
-                    IconButton({ viewModel.search(uiState.query) }) { 
-                        Icon(Icons.Default.Search, "搜索") 
-                    }
+                    IconButton({ viewModel.clearSearch() }) { Icon(Icons.Default.Clear, null) }
                 }
             },
             singleLine = true
         )
-        
-        // 搜索历史
-        if (uiState.showHistory && uiState.searchHistory.isNotEmpty() && !uiState.hasSearched) {
-            Spacer(Modifier.height(8.dp))
-            Row(
-                Modifier.fillMaxWidth(),
-                Arrangement.SpaceBetween,
-                Alignment.CenterVertically
-            ) {
-                Text("最近搜索", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-                TextButton({ showClearHistoryDialog = true }) { Text("清空", style = MaterialTheme.typography.bodySmall) }
-            }
-            Spacer(Modifier.height(8.dp))
-            LazyColumn(Modifier.height(120.dp)) {
-                items(uiState.searchHistory) { history ->
-                    Row(
-                        Modifier
-                            .fillMaxWidth()
-                            .clickable { viewModel.searchFromHistory(history) }
-                            .padding(vertical = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(Icons.Default.History, null, Modifier.size(16.dp), MaterialTheme.colorScheme.onSurfaceVariant)
-                        Spacer(Modifier.width(8.dp))
-                        Text(history)
-                    }
-                }
-            }
-            Spacer(Modifier.height(16.dp))
-        }
         
         Spacer(modifier = Modifier.height(16.dp))
         
@@ -186,108 +145,32 @@ fun SearchTab(viewModel: SearchViewModel = viewModel()) {
                 Spacer(Modifier.height(8.dp))
                 LazyColumn {
                     items(displayRecords) { record ->
-                        SearchResultCard(
-                            content = record.content,
-                            application = record.application,
-                            timestamp = record.createdAt,
-                            query = if (uiState.hasSearched) uiState.query else ""
-                        )
+                        Card(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+                            Column(Modifier.padding(12.dp)) {
+                                Text(record.content.take(100) + if (record.content.length > 100) "..." else "")
+                                Spacer(Modifier.height(4.dp))
+                                Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween) {
+                                    Text(record.application, style = MaterialTheme.typography.bodySmall)
+                                    Text(formatTime(record.createdAt), style = MaterialTheme.typography.bodySmall)
+                                }
+                            }
+                        }
                     }
                 }
             }
         }
     }
-    
-    // 清空历史确认对话框
-    if (showClearHistoryDialog) {
-        AlertDialog(
-            onDismissRequest = { showClearHistoryDialog = false },
-            title = { Text("清空搜索历史") },
-            text = { Text("确定要清空所有搜索历史吗？") },
-            confirmButton = {
-                Button({ viewModel.clearHistory(); showClearHistoryDialog = false }) { Text("清空") }
-            },
-            dismissButton = {
-                TextButton({ showClearHistoryDialog = false }) { Text("取消") }
-            }
-        )
-    }
 }
 
-/**
- * 搜索结果卡片（带高亮）
- */
-@Composable
-fun SearchResultCard(
-    content: String,
-    application: String,
-    timestamp: Long,
-    query: String
-) {
-    Card(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
-        Column(Modifier.padding(12.dp)) {
-            // 显示高亮文本
-            if (query.isNotBlank()) {
-                Text(
-                    text = TextHighlight.highlightText(
-                        text = content.take(100) + if (content.length > 100) "..." else "",
-                        query = query,
-                        highlightColor = Color.Yellow.copy(alpha = 0.5f)
-                    )
-                )
-            } else {
-                Text(content.take(100) + if (content.length > 100) "..." else "")
-            }
-            Spacer(Modifier.height(4.dp))
-            Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween) {
-                Text(application, style = MaterialTheme.typography.bodySmall)
-                Text(formatTime(timestamp), style = MaterialTheme.typography.bodySmall)
-            }
-        }
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LibraryTab(viewModel: LibraryViewModel = viewModel()) {
     val uiState by viewModel.uiState.collectAsState()
-    
-    // 查看详情页
-    if (uiState.selectedClip != null) {
-        ClipDetailScreen(
-            clip = uiState.selectedClip!!,
-            onBack = { viewModel.clearSelectedClip() },
-            onEdit = { updatedClip -> viewModel.updateClip(updatedClip) },
-            onDelete = { clipId -> viewModel.deleteClip(clipId) },
-            onIncrementView = { clipId -> viewModel.incrementViewCount(clipId) }
-        )
-        return
-    }
     
     // 刷新剪贴板
     LaunchedEffect(Unit) { viewModel.loadClipboardHistory() }
     
     Column(Modifier.fillMaxSize().padding(16.dp)) {
         Text("📚 知识库", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-        Spacer(Modifier.height(16.dp))
-        
-        // 搜索栏
-        OutlinedTextField(
-            value = uiState.searchQuery,
-            onValueChange = { viewModel.setSearchQuery(it) },
-            modifier = Modifier.fillMaxWidth(),
-            placeholder = { Text("搜索剪藏...") },
-            leadingIcon = { Icon(Icons.Default.Search, null) },
-            trailingIcon = {
-                if (uiState.searchQuery.isNotEmpty()) {
-                    IconButton({ viewModel.setSearchQuery("") }) { 
-                        Icon(Icons.Default.Clear, null) 
-                    }
-                }
-            },
-            singleLine = true
-        )
-        
         Spacer(Modifier.height(16.dp))
         
         // 剪贴板内容
@@ -301,7 +184,7 @@ fun LibraryTab(viewModel: LibraryViewModel = viewModel()) {
                 if (uiState.recentClipboard.isEmpty()) {
                     Text("复制内容后将显示在这里", style = MaterialTheme.typography.bodySmall)
                 } else {
-                    LazyColumn(Modifier.height(120.dp)) {
+                    LazyColumn(Modifier.height(150.dp)) {
                         items(uiState.recentClipboard) { item ->
                             Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), Arrangement.SpaceBetween, Alignment.CenterVertically) {
                                 Text(item.text.take(30) + if (item.text.length > 30) "..." else "", Modifier.weight(1f))
@@ -318,37 +201,40 @@ fun LibraryTab(viewModel: LibraryViewModel = viewModel()) {
         Spacer(Modifier.height(16.dp))
         
         // 已剪藏内容
-        Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween, Alignment.CenterVertically) {
-            Text("📌 我的剪藏", fontWeight = FontWeight.Bold)
-            Text("${uiState.clips.size} 条", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
+        Text("📌 我的剪藏", fontWeight = FontWeight.Bold)
         Spacer(Modifier.height(8.dp))
         
-        val displayClips = if (uiState.searchQuery.isNotBlank()) uiState.filteredClips else uiState.clips
-        
-        if (uiState.isLoading) {
-            Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
-        } else if (displayClips.isEmpty()) {
+        if (uiState.clips.isEmpty()) {
             Card(Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(32.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                     Icon(Icons.Default.BookmarkBorder, null, Modifier.size(48.dp))
                     Spacer(Modifier.height(8.dp))
-                    Text(if (uiState.searchQuery.isNotBlank()) "未找到匹配的剪藏" else "暂无剪藏内容")
-                    if (uiState.searchQuery.isBlank()) {
-                        Text("从上方剪贴板添加", style = MaterialTheme.typography.bodySmall)
-                    }
+                    Text("暂无剪藏内容")
+                    Text("从上方剪贴板添加", style = MaterialTheme.typography.bodySmall)
                 }
             }
         } else {
             LazyColumn {
-                items(displayClips) { clip ->
-                    ClipListItem(
-                        clip = clip,
-                        searchQuery = uiState.searchQuery,
-                        onClick = { viewModel.selectClip(clip) },
-                        onEdit = { viewModel.startEdit(clip) },
-                        onDelete = { viewModel.deleteClip(clip.id) }
-                    )
+                items(uiState.clips) { clip ->
+                    Card(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+                        Column(Modifier.padding(12.dp)) {
+                            Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween) {
+                                Text(text = clip.title, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                                Row {
+                                    IconButton({ viewModel.startEdit(clip) }) { 
+                                        Icon(Icons.Default.Edit, "编辑", Modifier.size(18.dp)) 
+                                    }
+                                    IconButton({ viewModel.deleteClip(clip.id) }) { 
+                                        Icon(Icons.Default.Delete, "删除", Modifier.size(18.dp)) 
+                                    }
+                                }
+                            }
+                            Spacer(Modifier.height(4.dp))
+                            Text(clip.content.take(100) + if (clip.content.length > 100) "..." else "", style = MaterialTheme.typography.bodyMedium)
+                            Spacer(Modifier.height(4.dp))
+                            Text(formatTime(clip.createdAt), style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
                 }
             }
         }
@@ -378,87 +264,12 @@ fun LibraryTab(viewModel: LibraryViewModel = viewModel()) {
                     }
                 },
                 confirmButton = {
-                    Button({ 
-                        val updatedClip = clip.copy(title = editTitle, content = editContent, updatedAt = System.currentTimeMillis())
-                        viewModel.updateClip(updatedClip)
-                    }) { Text("保存") }
+                    Button({ viewModel.updateClip(clip.id, editTitle, editContent) }) { Text("保存") }
                 },
                 dismissButton = {
                     TextButton({ viewModel.cancelEdit() }) { Text("取消") }
                 }
             )
-        }
-    }
-}
-
-/**
- * 剪藏列表项（带高亮）
- */
-@Composable
-fun ClipListItem(
-    clip: com.syncrime.shared.model.KnowledgeClip,
-    searchQuery: String,
-    onClick: () -> Unit,
-    onEdit: () -> Unit,
-    onDelete: () -> Unit
-) {
-    Card(
-        Modifier
-            .fillMaxWidth()
-            .padding(vertical = 4.dp)
-            .clickable(onClick = onClick)
-    ) {
-        Column(Modifier.padding(12.dp)) {
-            Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween) {
-                // 高亮标题
-                if (searchQuery.isNotBlank()) {
-                    Text(
-                        text = TextHighlight.highlightTextWithBold(
-                            text = clip.title,
-                            query = searchQuery,
-                            highlightColor = Color.Yellow.copy(alpha = 0.5f)
-                        ),
-                        modifier = Modifier.weight(1f)
-                    )
-                } else {
-                    Text(clip.title, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-                }
-                Row {
-                    IconButton(onEdit) { 
-                        Icon(Icons.Default.Edit, "编辑", Modifier.size(18.dp)) 
-                    }
-                    IconButton(onDelete) { 
-                        Icon(Icons.Default.Delete, "删除", Modifier.size(18.dp)) 
-                    }
-                }
-            }
-            Spacer(Modifier.height(4.dp))
-            // 高亮内容
-            if (searchQuery.isNotBlank()) {
-                Text(
-                    text = TextHighlight.highlightText(
-                        text = clip.content.take(100) + if (clip.content.length > 100) "..." else "",
-                        query = searchQuery,
-                        highlightColor = Color.Yellow.copy(alpha = 0.5f)
-                    ),
-                    style = MaterialTheme.typography.bodyMedium
-                )
-            } else {
-                Text(clip.content.take(100) + if (clip.content.length > 100) "..." else "", style = MaterialTheme.typography.bodyMedium)
-            }
-            Spacer(Modifier.height(4.dp))
-            Row(
-                Modifier.fillMaxWidth(),
-                Arrangement.SpaceBetween,
-                Alignment.CenterVertically
-            ) {
-                Text(formatTime(clip.createdAt), style = MaterialTheme.typography.bodySmall)
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.Visibility, null, Modifier.size(14.dp), MaterialTheme.colorScheme.onSurfaceVariant)
-                    Spacer(Modifier.width(4.dp))
-                    Text("${clip.viewCount}", style = MaterialTheme.typography.bodySmall)
-                }
-            }
         }
     }
 }
@@ -470,6 +281,7 @@ fun SettingsTab(viewModel: SettingsViewModel = viewModel()) {
     val uiState by viewModel.uiState.collectAsState()
     var showLoginDialog by remember { mutableStateOf(false) }
     
+    // 登录成功后自动关闭对话框
     LaunchedEffect(uiState.loginSuccess) {
         if (uiState.loginSuccess) {
             showLoginDialog = false
@@ -523,6 +335,7 @@ fun SettingsTab(viewModel: SettingsViewModel = viewModel()) {
             }
         }
         
+        // 消息提示
         uiState.message?.let {
             Spacer(Modifier.height(8.dp))
             Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)) {
@@ -531,6 +344,7 @@ fun SettingsTab(viewModel: SettingsViewModel = viewModel()) {
         }
     }
     
+    // 登录对话框
     if (showLoginDialog) {
         var email by remember { mutableStateOf("") }
         var password by remember { mutableStateOf("") }
