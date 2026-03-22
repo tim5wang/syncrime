@@ -219,7 +219,7 @@ fun LibraryTab(viewModel: LibraryViewModel = viewModel()) {
                     Card(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
                         Column(Modifier.padding(12.dp)) {
                             Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween) {
-                                Text(clip.title, fontWeight = FontWeight.Bold, Modifier.weight(1f))
+                                Text(text = clip.title, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
                                 Row {
                                     IconButton({ viewModel.startEdit(clip) }) { 
                                         Icon(Icons.Default.Edit, "编辑", Modifier.size(18.dp)) 

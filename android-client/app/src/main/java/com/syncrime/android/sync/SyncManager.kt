@@ -28,6 +28,31 @@ class SyncManager private constructor(private val context: Context) {
     private var lastSyncTime: Long = 0
     private var lastRecordCount: Int = 0
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private var autoSyncJob: Job? = null
+    
+    /**
+     * 启动自动同步
+     */
+    fun startAutoSync() {
+        if (autoSyncJob?.isActive == true) return
+        
+        autoSyncJob = scope.launch {
+            while (isActive) {
+                delay(SYNC_INTERVAL_MS)
+                checkAndSync()
+            }
+        }
+        Log.i(TAG, "自动同步已启动")
+    }
+    
+    /**
+     * 停止自动同步
+     */
+    fun stopAutoSync() {
+        autoSyncJob?.cancel()
+        autoSyncJob = null
+        Log.i(TAG, "自动同步已停止")
+    }
     
     /**
      * 检查并触发增量同步
@@ -90,7 +115,7 @@ class SyncManager private constructor(private val context: Context) {
     private suspend fun incrementalSync(database: AppDatabase, fromCount: Int): Boolean {
         return try {
             // 获取需要同步的记录
-            val allRecords = database.inputDao().getRecentSync(1000)
+            val allRecords = database.inputDao().getRecentSyncRecords(1000)
             val newRecords = if (fromCount > 0 && fromCount < allRecords.size) {
                 allRecords.take(fromCount) // 取最新的记录
             } else {

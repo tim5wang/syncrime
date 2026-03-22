@@ -42,6 +42,12 @@ interface ClipDao {
     suspend fun getById(id: Long): KnowledgeClip?
     
     /**
+     * 根据 ID 查询 (同步版本)
+     */
+    @Query("SELECT * FROM knowledge_clips WHERE id = :id")
+    suspend fun getByIdSync(id: Long): KnowledgeClip?
+    
+    /**
      * 获取所有剪藏（分页）
      */
     @Query("SELECT * FROM knowledge_clips ORDER BY createdAt DESC LIMIT :limit OFFSET :offset")
@@ -88,6 +94,12 @@ interface ClipDao {
      */
     @Query("SELECT COUNT(*) FROM knowledge_clips")
     fun getTotalCount(): Flow<Int>
+    
+    /**
+     * 统计总数 (同步版本)
+     */
+    @Query("SELECT COUNT(*) FROM knowledge_clips")
+    suspend fun getTotalCountSync(): Int
     
     /**
      * 统计今日新增
