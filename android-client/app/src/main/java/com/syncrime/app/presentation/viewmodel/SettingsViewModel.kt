@@ -28,7 +28,8 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         val isLoggingIn: Boolean = false,
         val loginError: String? = null,
         val message: String? = null,
-        val loginSuccess: Boolean = false
+        val loginSuccess: Boolean = false,
+        val isSyncing: Boolean = false
     )
     
     private val _uiState = MutableStateFlow(SettingsUiState())
@@ -78,13 +79,25 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                         userNickname = AuthService.getNickname(),
                         userEmail = AuthService.getEmail(),
                         isLoggingIn = false,
-                        message = "✅ 登录成功",
-                        loginSuccess = true
+                        message = "✅ 登录成功，正在同步数据...",
+                        loginSuccess = true,
+                        isSyncing = true
                     )
                     
-                    // 启动同步
-                    syncManager.syncNow { success, msg ->
-                        Log.d(TAG, "同步结果: $msg")
+                    // 先拉取云端数据，再推送本地数据
+                    viewModelScope.launch {
+                        val pullSuccess = syncManager.pullFromCloud()
+                        if (pullSuccess) {
+                            Log.d(TAG, "云端数据拉取成功")
+                        }
+                        
+                        syncManager.syncNow { success, msg ->
+                            _uiState.value = _uiState.value.copy(
+                                isSyncing = false,
+                                message = if (success) "✅ 登录成功，数据已同步" else "✅ 登录成功"
+                            )
+                            Log.d(TAG, "同步结果: $msg")
+                        }
                     }
                     
                     Log.d(TAG, "登录成功")

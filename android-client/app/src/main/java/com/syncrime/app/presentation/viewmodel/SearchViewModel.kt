@@ -1,6 +1,9 @@
 package com.syncrime.app.presentation.viewmodel
 
 import android.app.Application
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
 import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -23,6 +26,8 @@ class SearchViewModel(application: Application) : AndroidViewModel(application) 
         val searchHistory: List<String> = emptyList(),
         val hasSearched: Boolean = false,
         val showHistory: Boolean = true,
+        val selectedRecord: InputRecord? = null,
+        val message: String? = null,
         val error: String? = null
     )
     
@@ -31,6 +36,7 @@ class SearchViewModel(application: Application) : AndroidViewModel(application) 
     
     private val repository: DataRepository = DataRepository.getInstance(application)
     private val searchHistory = mutableListOf<String>()
+    private val clipboardManager = application.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
     
     init {
         loadRecentRecords()
@@ -115,5 +121,40 @@ class SearchViewModel(application: Application) : AndroidViewModel(application) 
             hasSearched = false,
             showHistory = true
         )
+    }
+    
+    fun selectRecord(record: InputRecord) {
+        _uiState.value = _uiState.value.copy(selectedRecord = record)
+    }
+    
+    fun clearSelectedRecord() {
+        _uiState.value = _uiState.value.copy(selectedRecord = null)
+    }
+    
+    fun copyRecord(record: InputRecord) {
+        val clip = ClipData.newPlainText("输入记录", record.content)
+        clipboardManager.setPrimaryClip(clip)
+        _uiState.value = _uiState.value.copy(message = "已复制到剪贴板")
+        Log.d(TAG, "复制记录: ${record.content.take(30)}...")
+    }
+    
+    fun deleteRecord(record: InputRecord) {
+        viewModelScope.launch {
+            try {
+                repository.deleteRecord(record.id)
+                _uiState.value = _uiState.value.copy(
+                    selectedRecord = null,
+                    message = "已删除"
+                )
+                Log.d(TAG, "删除记录: ${record.id}")
+            } catch (e: Exception) {
+                Log.e(TAG, "删除失败", e)
+                _uiState.value = _uiState.value.copy(error = "删除失败: ${e.message}")
+            }
+        }
+    }
+    
+    fun clearMessage() {
+        _uiState.value = _uiState.value.copy(message = null, error = null)
     }
 }

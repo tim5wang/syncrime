@@ -36,4 +36,10 @@ class DataRepository private constructor(context: Context) {
         return if (query.isBlank()) flowOf(emptyList())
         else inputDao.search(query).catch { emit(emptyList()) }
     }
+    
+    // 删除记录
+    suspend fun deleteRecord(id: Long) {
+        inputDao.deleteById(id)
+        Log.d(TAG, "删除记录: $id")
+    }
 }

@@ -35,6 +35,12 @@ interface InputDao {
     suspend fun delete(record: InputRecord)
     
     /**
+     * 根据 ID 删除记录
+     */
+    @Query("DELETE FROM input_records WHERE id = :id")
+    suspend fun deleteById(id: Long)
+    
+    /**
      * 根据 ID 查询
      */
     @Query("SELECT * FROM input_records WHERE id = :id")

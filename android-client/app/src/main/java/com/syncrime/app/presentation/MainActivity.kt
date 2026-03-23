@@ -105,13 +105,24 @@ fun SearchTab(viewModel: SearchViewModel = viewModel()) {
     val uiState by viewModel.uiState.collectAsState()
     val displayRecords = if (uiState.hasSearched) uiState.results else uiState.recentRecords
     
+    // 消息提示
+    LaunchedEffect(uiState.message) {
+        if (uiState.message != null) {
+            kotlinx.coroutines.delay(2000)
+            viewModel.clearMessage()
+        }
+    }
+    
     Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
         Text(if (uiState.hasSearched) "🔍 搜索结果" else "📝 最近输入", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
         Spacer(modifier = Modifier.height(16.dp))
         
         OutlinedTextField(
             value = uiState.query,
-            onValueChange = { viewModel.setQuery(it) },
+            onValueChange = { 
+                viewModel.setQuery(it)
+                if (it.length >= 2) viewModel.search(it)
+            },
             modifier = Modifier.fillMaxWidth(),
             placeholder = { Text("搜索输入记录...") },
             leadingIcon = { Icon(Icons.Default.Search, null) },
@@ -122,6 +133,14 @@ fun SearchTab(viewModel: SearchViewModel = viewModel()) {
             },
             singleLine = true
         )
+        
+        // 消息提示
+        uiState.message?.let {
+            Spacer(Modifier.height(8.dp))
+            Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)) {
+                Text(it, Modifier.padding(12.dp))
+            }
+        }
         
         Spacer(modifier = Modifier.height(16.dp))
         
@@ -145,13 +164,26 @@ fun SearchTab(viewModel: SearchViewModel = viewModel()) {
                 Spacer(Modifier.height(8.dp))
                 LazyColumn {
                     items(displayRecords) { record ->
-                        Card(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
-                            Column(Modifier.padding(12.dp)) {
+                        Card(
+                            Modifier.fillMaxWidth().padding(vertical = 4.dp)
+                        ) {
+                            Column(
+                                Modifier.padding(12.dp)
+                            ) {
                                 Text(record.content.take(100) + if (record.content.length > 100) "..." else "")
                                 Spacer(Modifier.height(4.dp))
-                                Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween) {
+                                Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween, Alignment.CenterVertically) {
                                     Text(record.application, style = MaterialTheme.typography.bodySmall)
-                                    Text(formatTime(record.createdAt), style = MaterialTheme.typography.bodySmall)
+                                    Row {
+                                        Text(formatTime(record.createdAt), style = MaterialTheme.typography.bodySmall)
+                                        Spacer(Modifier.width(8.dp))
+                                        IconButton({ viewModel.copyRecord(record) }, Modifier.size(32.dp)) { 
+                                            Icon(Icons.Default.ContentCopy, "复制", Modifier.size(18.dp)) 
+                                        }
+                                        IconButton({ viewModel.deleteRecord(record) }, Modifier.size(32.dp)) { 
+                                            Icon(Icons.Default.Delete, "删除", Modifier.size(18.dp)) 
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -159,6 +191,33 @@ fun SearchTab(viewModel: SearchViewModel = viewModel()) {
                 }
             }
         }
+    }
+    
+    // 详情对话框
+    uiState.selectedRecord?.let { record ->
+        AlertDialog(
+            onDismissRequest = { viewModel.clearSelectedRecord() },
+            title = { Text("输入记录详情") },
+            text = {
+                Column {
+                    Text(record.content, style = MaterialTheme.typography.bodyMedium)
+                    Spacer(Modifier.height(12.dp))
+                    Divider()
+                    Spacer(Modifier.height(8.dp))
+                    Text("应用: ${record.application}", style = MaterialTheme.typography.bodySmall)
+                    Text("时间: ${formatTime(record.createdAt)}", style = MaterialTheme.typography.bodySmall)
+                }
+            },
+            confirmButton = {
+                Button({ viewModel.copyRecord(record); viewModel.clearSelectedRecord() }) { Text("复制") }
+            },
+            dismissButton = {
+                Row {
+                    TextButton({ viewModel.deleteRecord(record) }) { Text("删除", color = MaterialTheme.colorScheme.error) }
+                    TextButton({ viewModel.clearSelectedRecord() }) { Text("关闭") }
+                }
+            }
+        )
     }
 }
 
