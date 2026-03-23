@@ -264,7 +264,7 @@ fun LibraryTab(viewModel: LibraryViewModel = viewModel()) {
                     }
                 },
                 confirmButton = {
-                    Button({ viewModel.updateClip(clip.id, editTitle, editContent) }) { Text("保存") }
+                    Button({ viewModel.updateClip(clip.copy(title = editTitle, content = editContent)) }) { Text("保存") }
                 },
                 dismissButton = {
                     TextButton({ viewModel.cancelEdit() }) { Text("取消") }

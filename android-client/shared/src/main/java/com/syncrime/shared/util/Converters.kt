@@ -1,7 +1,6 @@
 package com.syncrime.shared.util
 
 import androidx.room.TypeConverter
-import java.util.UUID
 
 /**
  * Room 类型转换器
@@ -9,7 +8,7 @@ import java.util.UUID
 class Converters {
     
     /**
-     * String List 转换
+     * String List 转换 (使用 ||| 分隔符)
      */
     @TypeConverter
     fun fromStringList(value: List<String>): String {
@@ -42,23 +41,6 @@ class Converters {
                 val (key, val1) = it.split("=", limit = 2)
                 key to val1
             }
-        }
-    }
-    
-    /**
-     * String List (图片/附件) 转换
-     */
-    @TypeConverter
-    fun fromUrlList(value: List<String>): String {
-        return value.joinToString(";;;")
-    }
-    
-    @TypeConverter
-    fun toUrlList(value: String): List<String> {
-        return if (value.isEmpty()) {
-            emptyList()
-        } else {
-            value.split(";;;")
         }
     }
 }

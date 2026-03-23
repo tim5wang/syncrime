@@ -140,7 +140,7 @@ android {
 
 dependencies {
     // 项目模块依赖 (暂时注释，等待模块配置修复)
-    // implementation(project(":shared"))
+    implementation(project(":shared"))
     // implementation(project(":inputmethod"))
     
     // Compose BOM

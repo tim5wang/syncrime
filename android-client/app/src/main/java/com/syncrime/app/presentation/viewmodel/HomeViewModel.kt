@@ -8,7 +8,7 @@ import androidx.lifecycle.viewModelScope
 import com.syncrime.app.data.DataRepository
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.*
-import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 
 class HomeViewModel(application: Application) : AndroidViewModel(application) {
     
@@ -47,14 +47,10 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         todayCountJob = viewModelScope.launch {
             repository.getTodayCount()
                 .catch { e -> 
-                    if (isActive) {
-                        _uiState.update { it.copy(error = e.message) }
-                    }
+                    _uiState.update { it.copy(error = e.message) }
                 }
                 .collect { count -> 
-                    if (isActive) {
-                        _uiState.update { it.copy(todayInputCount = count) }
-                    }
+                    _uiState.update { it.copy(todayInputCount = count) }
                 }
         }
         
@@ -62,9 +58,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             repository.getTotalCount()
                 .catch { /* silently handle */ }
                 .collect { count -> 
-                    if (isActive) {
-                        _uiState.update { it.copy(totalInputCount = count, isLoading = false) }
-                    }
+                    _uiState.update { it.copy(totalInputCount = count, isLoading = false) }
                 }
         }
     }
@@ -78,25 +72,17 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     private fun isAccessibilityServiceEnabled(): Boolean {
         val expectedComponentName = "${getApplication<Application>().packageName}/com.syncrime.android.accessibility.InputCaptureService"
         return try {
-            val enabledServices = Settings.Secure.getString(
+            Settings.Secure.getString(
                 getApplication<Application>().contentResolver,
                 Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES
-            ) ?: return false
-            enabledServices.contains(expectedComponentName)
+            )?.contains(expectedComponentName) == true
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to check accessibility", e)
             false
         }
     }
     
-    fun refresh() { 
-        loadStats()
-        checkAccessibilityStatus()
-    }
-    
     override fun onCleared() {
         super.onCleared()
-        // Clean up jobs when ViewModel is destroyed
         todayCountJob?.cancel()
         totalCountJob?.cancel()
         Log.d(TAG, "HomeViewModel cleared, jobs cancelled")
