@@ -16,13 +16,22 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.KeyboardOptions
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.TextField
+import com.syncrime.app.presentation.library.EnhancedLibraryScreen
 import com.syncrime.app.presentation.viewmodel.HomeViewModel
 import com.syncrime.app.presentation.viewmodel.LibraryViewModel
 import com.syncrime.app.presentation.viewmodel.SearchViewModel
 import com.syncrime.app.presentation.viewmodel.SettingsViewModel
 import com.syncrime.android.debug.DebugViewModel
+import com.syncrime.app.util.HighlightableText
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -117,22 +126,54 @@ fun SearchTab(viewModel: SearchViewModel = viewModel()) {
         Text(if (uiState.hasSearched) "🔍 搜索结果" else "📝 最近输入", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
         Spacer(modifier = Modifier.height(16.dp))
         
-        OutlinedTextField(
-            value = uiState.query,
-            onValueChange = { 
-                viewModel.setQuery(it)
-                if (it.length >= 2) viewModel.search(it)
-            },
-            modifier = Modifier.fillMaxWidth(),
-            placeholder = { Text("搜索输入记录...") },
-            leadingIcon = { Icon(Icons.Default.Search, null) },
-            trailingIcon = {
-                if (uiState.query.isNotEmpty()) {
-                    IconButton({ viewModel.clearSearch() }) { Icon(Icons.Default.Clear, null) }
+        Box {
+            OutlinedTextField(
+                value = uiState.query,
+                onValueChange = { 
+                    viewModel.setQuery(it)
+                    if (it.length >= 2) {
+                        viewModel.searchWithDebounce(it)
+                    } else if (it.isBlank()) {
+                        viewModel.clearSearch()
+                    }
+                },
+                modifier = Modifier.fillMaxWidth(),
+                placeholder = { Text("搜索输入记录...") },
+                leadingIcon = { Icon(Icons.Default.Search, null) },
+                trailingIcon = {
+                    if (uiState.query.isNotEmpty()) {
+                        IconButton({ viewModel.clearSearch() }) { Icon(Icons.Default.Clear, null) }
+                    }
+                },
+                singleLine = true
+            )
+            
+            // 搜索建议下拉列表
+            if (uiState.showSuggestions && uiState.suggestions.isNotEmpty()) {
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 8.dp),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+                ) {
+                    LazyColumn {
+                        items(uiState.suggestions) { suggestion ->
+                            Text(
+                                text = suggestion,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(12.dp)
+                                    .clickable {
+                                        viewModel.setQuery(suggestion)
+                                        viewModel.search(suggestion)
+                                    },
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                        }
+                    }
                 }
-            },
-            singleLine = true
-        )
+            }
+        }
         
         // 消息提示
         uiState.message?.let {
@@ -170,7 +211,16 @@ fun SearchTab(viewModel: SearchViewModel = viewModel()) {
                             Column(
                                 Modifier.padding(12.dp)
                             ) {
-                                Text(record.content.take(100) + if (record.content.length > 100) "..." else "")
+                                val displayContent = if (record.content.length > 100) {
+                    record.content.take(100) + "..."
+                } else {
+                    record.content
+                }
+                HighlightableText(
+                    text = displayContent,
+                    query = uiState.query,
+                    modifier = Modifier.clickable { viewModel.selectRecord(record) }
+                )
                                 Spacer(Modifier.height(4.dp))
                                 Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween, Alignment.CenterVertically) {
                                     Text(record.application, style = MaterialTheme.typography.bodySmall)
@@ -223,114 +273,7 @@ fun SearchTab(viewModel: SearchViewModel = viewModel()) {
 
 @Composable
 fun LibraryTab(viewModel: LibraryViewModel = viewModel()) {
-    val uiState by viewModel.uiState.collectAsState()
-    
-    // 刷新剪贴板
-    LaunchedEffect(Unit) { viewModel.loadClipboardHistory() }
-    
-    Column(Modifier.fillMaxSize().padding(16.dp)) {
-        Text("📚 知识库", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-        Spacer(Modifier.height(16.dp))
-        
-        // 剪贴板内容
-        Card(Modifier.fillMaxWidth()) {
-            Column(Modifier.padding(16.dp)) {
-                Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween, Alignment.CenterVertically) {
-                    Text("📋 剪贴板", fontWeight = FontWeight.Bold)
-                    IconButton({ viewModel.loadClipboardHistory() }) { Icon(Icons.Default.Refresh, null) }
-                }
-                Spacer(Modifier.height(8.dp))
-                if (uiState.recentClipboard.isEmpty()) {
-                    Text("复制内容后将显示在这里", style = MaterialTheme.typography.bodySmall)
-                } else {
-                    LazyColumn(Modifier.height(150.dp)) {
-                        items(uiState.recentClipboard) { item ->
-                            Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), Arrangement.SpaceBetween, Alignment.CenterVertically) {
-                                Text(item.text.take(30) + if (item.text.length > 30) "..." else "", Modifier.weight(1f))
-                                IconButton({ viewModel.addToClip(item.text) }) { 
-                                    Icon(Icons.Default.Add, "添加到剪藏", Modifier.size(20.dp)) 
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        
-        Spacer(Modifier.height(16.dp))
-        
-        // 已剪藏内容
-        Text("📌 我的剪藏", fontWeight = FontWeight.Bold)
-        Spacer(Modifier.height(8.dp))
-        
-        if (uiState.clips.isEmpty()) {
-            Card(Modifier.fillMaxWidth()) {
-                Column(Modifier.padding(32.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                    Icon(Icons.Default.BookmarkBorder, null, Modifier.size(48.dp))
-                    Spacer(Modifier.height(8.dp))
-                    Text("暂无剪藏内容")
-                    Text("从上方剪贴板添加", style = MaterialTheme.typography.bodySmall)
-                }
-            }
-        } else {
-            LazyColumn {
-                items(uiState.clips) { clip ->
-                    Card(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
-                        Column(Modifier.padding(12.dp)) {
-                            Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween) {
-                                Text(text = clip.title, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-                                Row {
-                                    IconButton({ viewModel.startEdit(clip) }) { 
-                                        Icon(Icons.Default.Edit, "编辑", Modifier.size(18.dp)) 
-                                    }
-                                    IconButton({ viewModel.deleteClip(clip.id) }) { 
-                                        Icon(Icons.Default.Delete, "删除", Modifier.size(18.dp)) 
-                                    }
-                                }
-                            }
-                            Spacer(Modifier.height(4.dp))
-                            Text(clip.content.take(100) + if (clip.content.length > 100) "..." else "", style = MaterialTheme.typography.bodyMedium)
-                            Spacer(Modifier.height(4.dp))
-                            Text(formatTime(clip.createdAt), style = MaterialTheme.typography.bodySmall)
-                        }
-                    }
-                }
-            }
-        }
-        
-        // 消息提示
-        uiState.message?.let {
-            Spacer(Modifier.height(8.dp))
-            Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)) {
-                Text(it, Modifier.padding(12.dp))
-            }
-            LaunchedEffect(it) { kotlinx.coroutines.delay(2000); viewModel.clearMessage() }
-        }
-        
-        // 编辑对话框
-        uiState.editingClip?.let { clip ->
-            var editTitle by remember { mutableStateOf(clip.title) }
-            var editContent by remember { mutableStateOf(clip.content) }
-            
-            AlertDialog(
-                onDismissRequest = { viewModel.cancelEdit() },
-                title = { Text("编辑剪藏") },
-                text = {
-                    Column {
-                        OutlinedTextField(editTitle, { editTitle = it }, label = { Text("标题") }, modifier = Modifier.fillMaxWidth())
-                        Spacer(Modifier.height(8.dp))
-                        OutlinedTextField(editContent, { editContent = it }, label = { Text("内容") }, modifier = Modifier.fillMaxWidth().height(150.dp), maxLines = 5)
-                    }
-                },
-                confirmButton = {
-                    Button({ viewModel.updateClip(clip.copy(title = editTitle, content = editContent)) }) { Text("保存") }
-                },
-                dismissButton = {
-                    TextButton({ viewModel.cancelEdit() }) { Text("取消") }
-                }
-            )
-        }
-    }
+    EnhancedLibraryScreen(viewModel)
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -417,7 +360,17 @@ fun SettingsTab(viewModel: SettingsViewModel = viewModel()) {
                 Column {
                     OutlinedTextField(email, { email = it }, label = { Text("邮箱") }, singleLine = true, modifier = Modifier.fillMaxWidth())
                     Spacer(Modifier.height(8.dp))
-                    OutlinedTextField(password, { password = it }, label = { Text("密码") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                    OutlinedTextField(
+                    value = password,
+                    onValueChange = { password = it },
+                    label = { Text("密码") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                    keyboardOptions = androidx.compose.ui.text.input.KeyboardOptions(
+                        keyboardType = androidx.compose.ui.text.input.KeyboardType.Password
+                    )
+                )
                     if (isRegister) {
                         Spacer(Modifier.height(8.dp))
                         OutlinedTextField(nickname, { nickname = it }, label = { Text("昵称（可选）") }, singleLine = true, modifier = Modifier.fillMaxWidth())

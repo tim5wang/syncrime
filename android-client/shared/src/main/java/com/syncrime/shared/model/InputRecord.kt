@@ -9,7 +9,15 @@ import com.syncrime.shared.util.Converters
  * 输入记录实体
  * 保存用户输入的内容
  */
-@Entity(tableName = "input_records")
+@Entity(
+    tableName = "input_records",
+    indices = [
+        androidx.room.Index(value = ["content"]),
+        androidx.room.Index(value = ["summary"]),
+        androidx.room.Index(value = ["content", "application"]),
+        androidx.room.Index(value = ["createdAt"])
+    ]
+)
 data class InputRecord(
     @PrimaryKey
     val id: Long = System.currentTimeMillis(),

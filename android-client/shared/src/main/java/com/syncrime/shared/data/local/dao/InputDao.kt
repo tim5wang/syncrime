@@ -95,15 +95,40 @@ interface InputDao {
     fun getByTag(tag: String): Flow<List<InputRecord>>
     
     /**
-     * 全文搜索
+     * 全文搜索 - 优化版
      */
     @Query("""
         SELECT * FROM input_records 
-        WHERE content LIKE '%' || :query || '%' 
-           OR summary LIKE '%' || :query || '%'
+        WHERE LOWER(content) LIKE LOWER(:query) ESCAPE '\'
+           OR LOWER(summary) LIKE LOWER(:query) ESCAPE '\'
         ORDER BY createdAt DESC
+        LIMIT 50
     """)
     fun search(query: String): Flow<List<InputRecord>>
+    
+    /**
+     * 模糊搜索 - 支持通配符
+     */
+    @Query("""
+        SELECT * FROM input_records 
+        WHERE LOWER(content) LIKE '%' || LOWER(:query) || '%' ESCAPE '\'
+           OR LOWER(summary) LIKE '%' || LOWER(:query) || '%' ESCAPE '\'
+        ORDER BY createdAt DESC
+        LIMIT 100
+    """)
+    fun fuzzySearch(query: String): Flow<List<InputRecord>>
+    
+    /**
+     * 获取搜索建议
+     */
+    @Query("""
+        SELECT DISTINCT content FROM input_records 
+        WHERE LOWER(content) LIKE LOWER(:query) ESCAPE '\' 
+          AND content != ''
+        ORDER BY createdAt DESC
+        LIMIT 10
+    """)
+    fun getSuggestions(query: String): Flow<List<String>>
     
     /**
      * 统计今日输入数量

@@ -7,15 +7,21 @@ import android.content.Context
 import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.syncrime.android.data.local.dao.SearchHistoryDao
+import com.syncrime.android.data.local.entity.SearchHistoryEntity
 import com.syncrime.app.data.DataRepository
 import com.syncrime.shared.model.InputRecord
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
 
 class SearchViewModel(application: Application) : AndroidViewModel(application) {
     
     companion object { 
         private const val TAG = "SearchViewModel"
+        private const val MAX_HISTORY_COUNT = 50
+        private const val SUGGESTION_LIMIT = 10
     }
     
     data class SearchUiState(
@@ -24,8 +30,10 @@ class SearchViewModel(application: Application) : AndroidViewModel(application) 
         val results: List<InputRecord> = emptyList(),
         val recentRecords: List<InputRecord> = emptyList(),
         val searchHistory: List<String> = emptyList(),
+        val suggestions: List<String> = emptyList(),
         val hasSearched: Boolean = false,
         val showHistory: Boolean = true,
+        val showSuggestions: Boolean = false,
         val selectedRecord: InputRecord? = null,
         val message: String? = null,
         val error: String? = null
@@ -35,11 +43,27 @@ class SearchViewModel(application: Application) : AndroidViewModel(application) 
     val uiState: StateFlow<SearchUiState> = _uiState.asStateFlow()
     
     private val repository: DataRepository = DataRepository.getInstance(application)
-    private val searchHistory = mutableListOf<String>()
+    private val searchHistoryDao: SearchHistoryDao = repository.getSearchHistoryDao()
     private val clipboardManager = application.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+    
+    // 防抖相关
+    private var searchJob: Job? = null
     
     init {
         loadRecentRecords()
+        observeSearchHistory()
+    }
+    
+    private fun observeSearchHistory() {
+        viewModelScope.launch {
+            searchHistoryDao.getAll(MAX_HISTORY_COUNT)
+                .catch { e -> Log.e(TAG, "加载搜索历史失败", e) }
+                .collect { history ->
+                    _uiState.value = _uiState.value.copy(
+                        searchHistory = history.map { it.query }.distinct()
+                    )
+                }
+        }
     }
     
     private fun loadRecentRecords() {
@@ -53,17 +77,42 @@ class SearchViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
     
+    private fun getSearchSuggestions(query: String) {
+        if (query.length >= 1) { // 至少输入1个字符就显示建议
+            viewModelScope.launch {
+                searchHistoryDao.getSuggestions(query, SUGGESTION_LIMIT)
+                    .catch { e -> 
+                        Log.e(TAG, "获取搜索建议失败", e)
+                        _uiState.value = _uiState.value.copy(suggestions = emptyList())
+                    }
+                    .collect { suggestions ->
+                        // 过滤掉当前正在输入的查询词本身
+                        val filteredSuggestions = suggestions.filter { it != query }
+                        Log.d(TAG, "获取搜索建议: ${filteredSuggestions.size} 条")
+                        _uiState.value = _uiState.value.copy(suggestions = filteredSuggestions)
+                    }
+            }
+        } else {
+            _uiState.value = _uiState.value.copy(suggestions = emptyList())
+        }
+    }
+    
     fun setQuery(query: String) {
         _uiState.value = _uiState.value.copy(
             query = query,
-            showHistory = query.isBlank()
+            showHistory = query.isBlank(),
+            showSuggestions = query.length >= 1 && query.isNotBlank()
         )
         
         if (query.isBlank()) {
             _uiState.value = _uiState.value.copy(
                 results = emptyList(),
-                hasSearched = false
+                hasSearched = false,
+                showSuggestions = false
             )
+        } else if (query.length >= 1) {
+            // 获取搜索建议
+            getSearchSuggestions(query)
         }
     }
     
@@ -76,6 +125,7 @@ class SearchViewModel(application: Application) : AndroidViewModel(application) 
                 isSearching = true,
                 hasSearched = true,
                 showHistory = false,
+                showSuggestions = false,
                 error = null
             )
             
@@ -92,15 +142,52 @@ class SearchViewModel(application: Application) : AndroidViewModel(application) 
                     )
                     
                     // 添加到搜索历史
-                    if (searchHistory.contains(query)) {
-                        searchHistory.remove(query)
-                    }
-                    searchHistory.add(0, query)
-                    if (searchHistory.size > 10) {
-                        searchHistory.removeLast()
-                    }
-                    _uiState.value = _uiState.value.copy(searchHistory = searchHistory.toList())
+                    addToSearchHistory(query, results.size)
                 }
+        }
+    }
+    
+    private suspend fun addToSearchHistory(query: String, resultCount: Int) {
+        // 检查是否已存在相同的查询，如果存在则先删除
+        val existing = searchHistoryDao.getAll(1).firstOrNull { it.query == query }
+        if (existing != null) {
+            searchHistoryDao.delete(existing)
+        }
+        
+        // 插入新记录
+        val entity = SearchHistoryEntity(
+            query = query,
+            resultCount = resultCount,
+            searchType = "input"
+        )
+        searchHistoryDao.insert(entity)
+        
+        // 保持历史记录数量在限制范围内
+        searchHistoryDao.deleteOldRecords(MAX_HISTORY_COUNT)
+    }
+    
+    /**
+     * 带防抖的搜索函数，避免频繁搜索
+     */
+    fun searchWithDebounce(query: String) {
+        if (query.isBlank()) {
+            viewModelScope.launch {
+                _uiState.value = _uiState.value.copy(
+                    results = emptyList(),
+                    hasSearched = false,
+                    showSuggestions = false
+                )
+            }
+            return
+        }
+        
+        // 取消之前的搜索任务
+        searchJob?.cancel()
+        
+        // 启动新的带延迟的搜索任务
+        searchJob = viewModelScope.launch {
+            delay(300) // 300ms 防抖延迟
+            search(query)
         }
     }
     
@@ -110,8 +197,10 @@ class SearchViewModel(application: Application) : AndroidViewModel(application) 
     }
     
     fun clearHistory() {
-        searchHistory.clear()
-        _uiState.value = _uiState.value.copy(searchHistory = emptyList())
+        viewModelScope.launch {
+            repository.clearSearchHistory()
+            _uiState.value = _uiState.value.copy(searchHistory = emptyList())
+        }
     }
     
     fun clearSearch() { 
@@ -119,7 +208,9 @@ class SearchViewModel(application: Application) : AndroidViewModel(application) 
             query = "", 
             results = emptyList(), 
             hasSearched = false,
-            showHistory = true
+            showHistory = true,
+            showSuggestions = false,
+            suggestions = emptyList()
         )
     }
     

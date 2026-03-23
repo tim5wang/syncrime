@@ -53,8 +53,9 @@ class InputCaptureService : AccessibilityService() {
     private var lastEventTime: Long = 0
     private var inputCount: AtomicLong = AtomicLong(0)
     
-    // 事件去重缓存 (100ms 内的相同事件)
-    private val eventCache = mutableSetOf<String>()
+    // 事件去重缓存 (基于内容的去重，防止重复输入)
+    private val contentCache = mutableMapOf<String, Long>() // content to timestamp
+    private val cacheCleanupInterval = 5000L // 5秒清理一次过期内容
     private val cacheScope = CoroutineScope(Dispatchers.Default)
     
     override fun onServiceConnected() {
@@ -90,16 +91,6 @@ class InputCaptureService : AccessibilityService() {
         
         // 检查是否需要过滤
         if (shouldIgnoreEvent(event)) return
-        
-        // 事件去重（100ms 内的相同事件只处理一次）
-        val eventKey = "${event.packageName}_${event.eventType}_${System.currentTimeMillis() / 100}"
-        if (!eventCache.add(eventKey)) return
-        
-        // 清理缓存
-        cacheScope.launch {
-            delay(100)
-            eventCache.remove(eventKey)
-        }
         
         serviceScope.launch {
             try {
@@ -142,6 +133,13 @@ class InputCaptureService : AccessibilityService() {
         // 隐私过滤
         val filtered = privacyFilter.filter(text)
         
+        // 内容去重检查
+        if (isDuplicateContent(filtered.content, packageName)) {
+            Log.d(TAG, "发现重复内容，跳过保存")
+            source.recycle()
+            return
+        }
+        
         // 确保有活跃的会话
         ensureActiveSession(packageName, event.className?.toString() ?: "")
         
@@ -162,6 +160,9 @@ class InputCaptureService : AccessibilityService() {
             // 保存到数据库
             inputDao.insert(record)
             inputCount.incrementAndGet()
+            
+            // 添加到去重缓存
+            addToContentCache(filtered.content, packageName)
             
             Log.d(TAG, "📝 采集输入：${filtered.content.length} 字符 | 应用：$packageName | 敏感：${filtered.isSensitive}")
         }
@@ -275,6 +276,54 @@ class InputCaptureService : AccessibilityService() {
             packageName.contains("note") || packageName.contains("memo") -> "笔记"
             packageName.contains("browser") || packageName.contains("chrome") -> "浏览"
             else -> "其他"
+        }
+    }
+    
+    /**
+     * 检查是否为重复内容
+     */
+    private fun isDuplicateContent(content: String, packageName: String): Boolean {
+        if (content.isBlank()) return true
+        
+        // 清理过期缓存
+        cleanupExpiredCache()
+        
+        // 生成缓存键：应用包名 + 内容哈希
+        val cacheKey = "$packageName:${content.trim()}"
+        val currentTime = System.currentTimeMillis()
+        
+        // 检查是否已存在相同内容
+        val lastTimestamp = contentCache[cacheKey]
+        return if (lastTimestamp != null) {
+            // 如果内容在短时间内再次出现，则认为是重复的
+            val timeDiff = currentTime - lastTimestamp
+            timeDiff < cacheCleanupInterval  // 5秒内认为是重复
+        } else {
+            false
+        }
+    }
+    
+    /**
+     * 将内容添加到去重缓存
+     */
+    private fun addToContentCache(content: String, packageName: String) {
+        if (content.isBlank()) return
+        
+        val cacheKey = "$packageName:${content.trim()}"
+        contentCache[cacheKey] = System.currentTimeMillis()
+    }
+    
+    /**
+     * 清理过期的缓存内容
+     */
+    private fun cleanupExpiredCache() {
+        val currentTime = System.currentTimeMillis()
+        val keysToRemove = contentCache.filter { (_, timestamp) ->
+            currentTime - timestamp > cacheCleanupInterval
+        }.keys
+        
+        keysToRemove.forEach { key ->
+            contentCache.remove(key)
         }
     }
     

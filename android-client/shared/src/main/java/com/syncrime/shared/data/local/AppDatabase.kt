@@ -9,6 +9,7 @@ import com.syncrime.shared.data.local.dao.ClipDao
 import com.syncrime.shared.data.local.dao.InputDao
 import com.syncrime.shared.model.InputRecord
 import com.syncrime.shared.model.KnowledgeClip
+import com.syncrime.android.data.local.dao.SearchHistoryDao
 import com.syncrime.shared.util.Converters
 
 /**
@@ -17,9 +18,10 @@ import com.syncrime.shared.util.Converters
 @Database(
     entities = [
         InputRecord::class,
-        KnowledgeClip::class
+        KnowledgeClip::class,
+        com.syncrime.android.data.local.entity.SearchHistoryEntity::class
     ],
-    version = 1,
+    version = 3,  // 增加版本号以应用索引更改
     exportSchema = true
 )
 @TypeConverters(Converters::class)
@@ -34,6 +36,11 @@ abstract class AppDatabase : RoomDatabase() {
      * 知识剪藏 DAO
      */
     abstract fun clipDao(): ClipDao
+    
+    /**
+     * 搜索历史 DAO
+     */
+    abstract fun searchHistoryDao(): SearchHistoryDao
     
     companion object {
         @Volatile

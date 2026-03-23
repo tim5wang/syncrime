@@ -62,7 +62,7 @@ interface ClipDao {
     /**
      * 按标签查询
      */
-    @Query("SELECT * FROM knowledge_clips WHERE tags LIKE '%' || :tag || '%' ORDER BY createdAt DESC")
+    @Query("SELECT * FROM knowledge_clips WHERE ',' || tags || ',' LIKE '%,' || :tag || ',%' ORDER BY createdAt DESC")
     fun getByTag(tag: String): Flow<List<KnowledgeClip>>
     
     /**
@@ -88,6 +88,29 @@ interface ClipDao {
             createdAt DESC
     """)
     fun search(query: String): Flow<List<KnowledgeClip>>
+    
+    /**
+     * 按分类和标签组合查询
+     */
+    @Query("""
+        SELECT * FROM knowledge_clips 
+        WHERE (:category IS NULL OR category = :category)
+          AND (:tag IS NULL OR ',' || tags || ',' LIKE '%,' || :tag || ',%')
+        ORDER BY createdAt DESC
+    """)
+    fun getByCategoryAndTag(category: String?, tag: String?): Flow<List<KnowledgeClip>>
+    
+    /**
+     * 获取所有唯一标签
+     */
+    @Query("SELECT tags FROM knowledge_clips WHERE tags IS NOT NULL AND tags != ''")
+    suspend fun getAllTagStrings(): List<String>
+    
+    /**
+     * 获取所有分类
+     */
+    @Query("SELECT DISTINCT category FROM knowledge_clips WHERE category IS NOT NULL ORDER BY category")
+    fun getAllCategories(): Flow<List<String>>
     
     /**
      * 统计总数
