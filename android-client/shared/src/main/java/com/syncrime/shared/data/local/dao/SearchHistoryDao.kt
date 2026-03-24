@@ -1,4 +1,4 @@
-package com.syncrime.android.data.local.dao
+package com.syncrime.shared.data.local.dao
 
 import androidx.room.*
 import com.syncrime.shared.data.local.entity.SearchHistoryEntity

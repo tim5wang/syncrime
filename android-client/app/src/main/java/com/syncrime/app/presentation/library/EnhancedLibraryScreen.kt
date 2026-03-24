@@ -400,6 +400,7 @@ fun ClipItemCard(
                 ) {
                     clip.tags.take(3).forEach { tag ->
                         InputChip(
+                            selected = false,
                             onClick = { onSelectTag(tag) },
                             label = { Text(tag) },
                             leadingIcon = { 

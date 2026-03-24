@@ -7,9 +7,10 @@ import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
 import com.syncrime.shared.data.local.dao.ClipDao
 import com.syncrime.shared.data.local.dao.InputDao
+import com.syncrime.shared.data.local.dao.SearchHistoryDao
+import com.syncrime.shared.data.local.entity.SearchHistoryEntity
 import com.syncrime.shared.model.InputRecord
 import com.syncrime.shared.model.KnowledgeClip
-import com.syncrime.android.data.local.dao.SearchHistoryDao
 import com.syncrime.shared.util.Converters
 
 /**
@@ -19,7 +20,7 @@ import com.syncrime.shared.util.Converters
     entities = [
         InputRecord::class,
         KnowledgeClip::class,
-        com.syncrime.android.data.local.entity.SearchHistoryEntity::class
+        SearchHistoryEntity::class
     ],
     version = 3,  // 增加版本号以应用索引更改
     exportSchema = true

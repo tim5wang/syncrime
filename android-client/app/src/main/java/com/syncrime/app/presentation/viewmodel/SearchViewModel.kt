@@ -7,8 +7,8 @@ import android.content.Context
 import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.syncrime.android.data.local.dao.SearchHistoryDao
-import com.syncrime.android.data.local.entity.SearchHistoryEntity
+import com.syncrime.shared.data.local.dao.SearchHistoryDao
+import com.syncrime.shared.data.local.entity.SearchHistoryEntity
 import com.syncrime.app.data.DataRepository
 import com.syncrime.shared.model.InputRecord
 import kotlinx.coroutines.Job
@@ -43,7 +43,7 @@ class SearchViewModel(application: Application) : AndroidViewModel(application) 
     val uiState: StateFlow<SearchUiState> = _uiState.asStateFlow()
     
     private val repository: DataRepository = DataRepository.getInstance(application)
-    private val searchHistoryDao: SearchHistoryDao = repository.getSearchHistoryDao()
+    private val searchHistoryDao: SearchHistoryDao = repository.searchHistoryDao
     private val clipboardManager = application.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
     
     // 防抖相关
@@ -149,7 +149,8 @@ class SearchViewModel(application: Application) : AndroidViewModel(application) 
     
     private suspend fun addToSearchHistory(query: String, resultCount: Int) {
         // 检查是否已存在相同的查询，如果存在则先删除
-        val existing = searchHistoryDao.getAll(1).firstOrNull { it.query == query }
+        val allHistory = searchHistoryDao.getAll(MAX_HISTORY_COUNT).first()
+        val existing = allHistory.firstOrNull { it.query == query }
         if (existing != null) {
             searchHistoryDao.delete(existing)
         }

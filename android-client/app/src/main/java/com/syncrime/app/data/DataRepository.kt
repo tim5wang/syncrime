@@ -4,7 +4,8 @@ import android.content.Context
 import android.util.Log
 import com.syncrime.shared.data.local.AppDatabase
 import com.syncrime.shared.data.local.dao.InputDao
-import com.syncrime.android.data.local.dao.SearchHistoryDao
+import com.syncrime.shared.data.local.dao.SearchHistoryDao
+import com.syncrime.shared.data.local.entity.SearchHistoryEntity
 import kotlinx.coroutines.flow.*
 
 class DataRepository private constructor(context: Context) {
@@ -23,7 +24,7 @@ class DataRepository private constructor(context: Context) {
     
     private val database: AppDatabase by lazy { AppDatabase.getDatabase(context) }
     private val inputDao: InputDao by lazy { database.inputDao() }
-    private val searchHistoryDao: SearchHistoryDao by lazy { database.searchHistoryDao() }
+    val searchHistoryDao: SearchHistoryDao by lazy { database.searchHistoryDao() }
     
     fun getTodayCount(): Flow<Int> = inputDao.getTodayCount().catch { emit(0) }
     fun getTotalCount(): Flow<Int> = inputDao.getTotalCount().catch { emit(0) }
@@ -60,7 +61,7 @@ class DataRepository private constructor(context: Context) {
     
     // 添加搜索历史
     suspend fun addSearchHistory(query: String, resultCount: Int = 0) {
-        val entity = com.syncrime.android.data.local.entity.SearchHistoryEntity(
+        val entity = SearchHistoryEntity(
             query = query,
             resultCount = resultCount,
             searchType = "input"
@@ -73,11 +74,6 @@ class DataRepository private constructor(context: Context) {
     // 清空搜索历史
     suspend fun clearSearchHistory() {
         searchHistoryDao.deleteOldRecords(0)
-    }
-    
-    // 获取搜索历史DAO（供外部使用）
-    fun getSearchHistoryDao(): SearchHistoryDao {
-        return searchHistoryDao
     }
     
     // 删除记录
